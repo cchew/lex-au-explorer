@@ -1,0 +1,23 @@
+{
+  "acts": {
+    "privacy-act-1988": {
+      "name": "Privacy Act 1988",
+      "title_id": "C2004A03712",
+      "comp_id": "C2026C00227",
+      "year": 1988,
+      "number": 119,
+      "effective_date": "2026-06-04",
+      "xml_path": "xml/privacy-act-1988.xml"
+    },
+    "income-tax-assessment-act-1997": {
+      "name": "Income Tax Assessment Act 1997",
+      "title_id": "C2004A05138",
+      "comp_id": "C2026C00100",
+      "year": 1997,
+      "number": 38,
+      "effective_date": "2026-01-01",
+      "xml_path": "xml/income-tax-assessment-act-1997.xml"
+    }
+  },
+  "updated_at": "2026-08-01"
+}
