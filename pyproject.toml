@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=72"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lex-au-explorer"
+version = "0.1.0"
+description = "Public showcase site for the AU Legislative Intelligence Stack -- build pipeline for the static legislation reader"
+authors = [{name = "Ching Chew", email = "ching.chew@gmail.com"}]
+license = {text = "MIT"}
+requires-python = ">=3.12"
+dependencies = [
+    "lxml>=5.3",
+    "lex-au-graph @ file:///../../lex-au-graph/repo",
+]
+
+[project.scripts]
+lex-au-explorer-build = "build.cli:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["build*"]

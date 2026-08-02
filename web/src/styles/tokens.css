@@ -1,0 +1,61 @@
+:root {
+  /* Backgrounds */
+  --color-bg: oklch(98% 0.005 80);
+  --color-surface: oklch(100% 0 0);
+  --color-surface-hover: oklch(95% 0.008 80);
+  --color-surface-active: oklch(92% 0.018 80);
+  --color-surface-raised: oklch(96% 0.005 80);
+
+  /* Text */
+  --color-ink: oklch(15% 0.01 250);
+  --color-ink-2: oklch(45% 0.01 250);
+  --color-ink-3: oklch(65% 0.01 250);
+
+  /* Borders */
+  --color-border: oklch(88% 0.008 80);
+  --color-border-light: oklch(95% 0.005 80);
+
+  /* Accent (source span highlight — amber) */
+  --color-accent-bg: oklch(94% 0.06 80);
+  --color-accent-border: oklch(68% 0.14 80);
+
+  /* Label chips — semantic traffic-light only */
+  --chip-grounded-bg:     oklch(90% 0.05 155);
+  --chip-grounded-text:   oklch(32% 0.12 155);
+  --chip-grounded-border: oklch(78% 0.08 155);
+
+  --chip-partial-bg:     oklch(92% 0.06 75);
+  --chip-partial-text:   oklch(38% 0.12 75);
+  --chip-partial-border: oklch(80% 0.09 75);
+
+  --chip-unsupported-bg:     oklch(91% 0.05 25);
+  --chip-unsupported-text:   oklch(35% 0.14 25);
+  --chip-unsupported-border: oklch(79% 0.08 25);
+
+  /* Typography */
+  --font-ui: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'Fira Code', monospace;
+
+  /* Spacing scale */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
+  --s-8: 64px;
+
+  /* Layout */
+  --reading-width: 960px;
+
+  /* Shape */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 14px;
+  --shadow-sm: 0 1px 3px oklch(10% 0.01 250 / 0.08);
+  --shadow-md: 0 2px 8px oklch(10% 0.01 250 / 0.08), 0 1px 3px oklch(10% 0.01 250 / 0.05);
+
+  /* Motion */
+  --ease-spring: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
