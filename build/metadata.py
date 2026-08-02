@@ -2,8 +2,23 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
+import lxml.etree as ET
+
+AKN_NS = "http://docs.oasis-open.org/legaldocml/ns/akn/3.0"
+AKN = f"{{{AKN_NS}}}"
 
 _SPLIT_BY_PART_THRESHOLD_BYTES = 5 * 1024 * 1024  # 5MB raw XML
+
+
+def _parse_frbr_uri(xml_path: Path) -> str:
+    if not xml_path.exists():
+        return ""
+    try:
+        root = ET.parse(str(xml_path)).getroot()
+        work_uri_el = root.find(f".//{AKN}FRBRWork/{AKN}FRBRuri")
+        return work_uri_el.get("value", "").rstrip("/") if work_uri_el is not None else ""
+    except ET.XMLSyntaxError:
+        return ""
 
 
 @dataclass
@@ -36,6 +51,7 @@ def load_corpus_index(index_path: Path, xml_dir: Path) -> dict[str, ActMeta]:
             effective_date=entry["effective_date"],
             xml_path=xml_path,
             split_by_part=size >= _SPLIT_BY_PART_THRESHOLD_BYTES,
+            frbr_uri=_parse_frbr_uri(xml_path),
         )
     return result
 
