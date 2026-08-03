@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.scripts]
-lex-au-explorer-build = "build.cli:main"
+lex-au-explorer-build = "build.cli:app"
 
 [project.optional-dependencies]
 dev = [
