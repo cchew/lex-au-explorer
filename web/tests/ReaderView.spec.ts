@@ -41,12 +41,52 @@ const MOCK_SPLIT_INDEX = [
   { title: "Fair Work Act 2009", slug: "fair-work-act-2009", frbr_uri: "/akn/au/act/2009/28", split_by_part: true }
 ];
 
+// Real fetch Responses expose Content-Type via `.headers.get(...)` and a
+// `.text()` method; ReaderView's fetchJson() checks both (see Task 13 Fix
+// Round 1 — content-type gates 404-vs-malformed-JSON classification), so
+// mocks must mirror that shape rather than just `{ ok, json }`.
+function jsonResponse(body: unknown) {
+  return {
+    ok: true,
+    headers: { get: (name: string) => (name.toLowerCase() === "content-type" ? "application/json" : null) },
+    text: async () => JSON.stringify(body),
+    json: async () => body,
+  };
+}
+
+// Simulates Vite's dev-server / Netlify's SPA-fallback response for a
+// missing /data/*.json path: 200 OK, but Content-Type: text/html.
+function htmlResponse() {
+  return {
+    ok: true,
+    headers: { get: (name: string) => (name.toLowerCase() === "content-type" ? "text/html" : null) },
+    text: async () => "<!DOCTYPE html><html></html>",
+    json: async () => {
+      throw new Error("Unexpected token '<'");
+    },
+  };
+}
+
+// Simulates a build-pipeline bug: the file genuinely has Content-Type:
+// application/json but the body is truncated/corrupted, so JSON.parse throws.
+// This must NOT be mislabeled "HTTP 404" — see Task 13 Fix Round 1.
+function malformedJsonResponse() {
+  return {
+    ok: true,
+    headers: { get: (name: string) => (name.toLowerCase() === "content-type" ? "application/json" : null) },
+    text: async () => '{"truncated": tr',
+    json: async () => {
+      throw new Error("Unexpected end of JSON input");
+    },
+  };
+}
+
 beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn(async (url: string) => {
     if (url.includes("index.json")) {
-      return { ok: true, json: async () => MOCK_INDEX };
+      return jsonResponse(MOCK_INDEX);
     }
-    return { ok: true, json: async () => MOCK_BUNDLE };
+    return jsonResponse(MOCK_BUNDLE);
   }));
 });
 
@@ -82,13 +122,13 @@ describe("ReaderView", () => {
   it("fetches the first Part's sections separately for split-by-Part Acts and merges them", async () => {
     vi.stubGlobal("fetch", vi.fn(async (url: string) => {
       if (url.includes("index.json")) {
-        return { ok: true, json: async () => MOCK_SPLIT_INDEX };
+        return jsonResponse(MOCK_SPLIT_INDEX);
       }
       if (url.includes("/fair-work-act-2009/part-I.json")) {
-        return { ok: true, json: async () => MOCK_SPLIT_PART_BUNDLE };
+        return jsonResponse(MOCK_SPLIT_PART_BUNDLE);
       }
       // Initial bundle fetch: /data/fair-work-act-2009.json (index bundle, empty sections)
-      return { ok: true, json: async () => MOCK_SPLIT_INDEX_BUNDLE };
+      return jsonResponse(MOCK_SPLIT_INDEX_BUNDLE);
     }));
 
     const router = createRouter({
@@ -123,12 +163,12 @@ describe("ReaderView", () => {
   it("shows an error and falls back to ActSearch when the Part fetch fails", async () => {
     vi.stubGlobal("fetch", vi.fn(async (url: string) => {
       if (url.includes("index.json")) {
-        return { ok: true, json: async () => MOCK_SPLIT_INDEX };
+        return jsonResponse(MOCK_SPLIT_INDEX);
       }
       if (url.includes("/fair-work-act-2009/part-I.json")) {
-        return { ok: false, status: 404, json: async () => ({}) };
+        return { ok: false, status: 404, headers: { get: () => null }, text: async () => "", json: async () => ({}) };
       }
-      return { ok: true, json: async () => MOCK_SPLIT_INDEX_BUNDLE };
+      return jsonResponse(MOCK_SPLIT_INDEX_BUNDLE);
     }));
 
     const router = createRouter({
@@ -160,5 +200,68 @@ describe("ReaderView", () => {
     // No half-rendered reader shell: back to ActSearch, no TOC/content pane
     expect(wrapper.find(".reader-layout").exists()).toBe(false);
     expect(wrapper.find(".shortcut-btn").exists()).toBe(true);
+  });
+
+  it("shows HTTP 404 when the response is an SPA-fallback HTML shell, not a real 404 status", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url.includes("index.json")) return jsonResponse(MOCK_INDEX);
+      return htmlResponse();
+    }));
+
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: "/reader", component: ReaderView }]
+    });
+    router.push("/reader");
+    await router.isReady();
+
+    const wrapper = mount(ReaderView, { global: { plugins: [router] } });
+    await new Promise(resolve => setTimeout(resolve, 10));
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+
+    const shortcutBtn = wrapper.find(".shortcut-btn");
+    expect(shortcutBtn.exists()).toBe(true);
+    await shortcutBtn.trigger("click");
+
+    await new Promise(resolve => setTimeout(resolve, 10));
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find(".load-error").exists()).toBe(true);
+    expect(wrapper.text()).toContain("HTTP 404");
+  });
+
+  it("shows a distinct error (not HTTP 404) when a JSON-typed response fails to parse", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url.includes("index.json")) return jsonResponse(MOCK_INDEX);
+      return malformedJsonResponse();
+    }));
+
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: "/reader", component: ReaderView }]
+    });
+    router.push("/reader");
+    await router.isReady();
+
+    const wrapper = mount(ReaderView, { global: { plugins: [router] } });
+    await new Promise(resolve => setTimeout(resolve, 10));
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+
+    const shortcutBtn = wrapper.find(".shortcut-btn");
+    expect(shortcutBtn.exists()).toBe(true);
+    await shortcutBtn.trigger("click");
+
+    await new Promise(resolve => setTimeout(resolve, 10));
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find(".load-error").exists()).toBe(true);
+    expect(wrapper.text()).not.toContain("HTTP 404");
+    expect(wrapper.text()).toContain("Invalid response");
   });
 });
