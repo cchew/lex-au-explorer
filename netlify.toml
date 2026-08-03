@@ -1,6 +1,14 @@
 [build]
   base = "web"
-  command = "npm run build"
+  # No remote build: the Python pipeline needs sibling lex-au/lex-au-graph
+  # repos and a venv that Netlify's build container doesn't have. web/dist
+  # (real corpus baked in) is built locally via `npm run predeploy && npm run
+  # build`, then shipped directly with `netlify deploy --prod --dir=web/dist`
+  # -- see README's Deploy section. This command is a no-op so an accidental
+  # "Trigger deploy" in the Netlify UI doesn't overwrite dist with a build
+  # that would only have the small E2E fixture data committed under
+  # web/public/data.
+  command = "true"
   publish = "dist"
 
 [[redirects]]
