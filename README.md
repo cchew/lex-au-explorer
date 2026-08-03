@@ -23,6 +23,6 @@ Vite bundling `public/`) deployed as a pre-built directory.
 
 ## Versions
 
-- v0.1.0 (in development): shell + legislation reader with hover-definitions.
+- v0.1.0: shell + legislation reader with hover-definitions, section-scoped hover tooltips, source-fidelity panel. Real corpus build verified (3,078 Acts, zero failures). Not yet deployed.
 
 MIT licensed.
