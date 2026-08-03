@@ -11,6 +11,8 @@ const route = useRoute();
 const bundle = ref<ActBundle | null>(null);
 const activeSection = ref<string | null>(null);
 const error = ref<string | null>(null);
+const currentSlug = ref<string | null>(null);
+const loadedPartEid = ref<string | null>(null);
 
 // Fetch + parse a JSON bundle, distinguishing "not found" from "malformed."
 //
@@ -41,6 +43,8 @@ async function selectAct(slug: string) {
   error.value = null;
   bundle.value = null;
   activeSection.value = null;
+  currentSlug.value = slug;
+  loadedPartEid.value = null;
   try {
     const data = await fetchJson<ActBundle>(`/data/${slug}.json`);
     bundle.value = data;
@@ -61,6 +65,7 @@ async function loadPart(slug: string, partEid: string) {
     if (bundle.value) {
       bundle.value = { ...bundle.value, sections: partData.sections, definitions: partData.definitions };
     }
+    loadedPartEid.value = partEid;
     activeSection.value = Object.keys(partData.sections)[0] ?? null;
   } catch (e) {
     error.value = e instanceof Error ? e.message : "Failed to load Act";
@@ -68,8 +73,31 @@ async function loadPart(slug: string, partEid: string) {
   }
 }
 
-function selectSection(eid: string) {
-  activeSection.value = eid;
+// AKN eId convention: a section's owning top-level Part is the first
+// "__"-delimited segment (e.g. "part-II__dvs-1__sec-6AA" -> "part-II"),
+// matching lex-au-graph's containment-prefix derivation in resolver.py.
+// The Part node's own eid (e.g. "part-II") has no "__" at all, so it is
+// already its own owning Part.
+function ownerPartEid(eid: string): string {
+  // String.split always returns at least one element; the fallback is
+  // unreachable but satisfies noUncheckedIndexedAccess.
+  return eid.split("__", 1)[0] ?? eid;
+}
+
+async function selectSection(eid: string) {
+  if (!bundle.value?.split_by_part) {
+    activeSection.value = eid;
+    return;
+  }
+  const targetPart = ownerPartEid(eid);
+  if (targetPart === loadedPartEid.value) {
+    activeSection.value = eid;
+    return;
+  }
+  if (currentSlug.value) {
+    await loadPart(currentSlug.value, targetPart);
+    activeSection.value = eid;
+  }
 }
 
 onMounted(() => {

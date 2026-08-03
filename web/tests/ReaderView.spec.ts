@@ -37,6 +37,22 @@ const MOCK_SPLIT_PART_BUNDLE = {
   definitions: {},
 };
 
+// Index bundle with two top-level Parts in its TOC, so a click on a Part II
+// leaf can be exercised. Sections stay empty (per Task 7's index-only bundle).
+const MOCK_SPLIT_INDEX_BUNDLE_TWO_PARTS = {
+  ...MOCK_SPLIT_INDEX_BUNDLE,
+  toc: [
+    { eid: "part-I", heading: "Part 1", children: [{ eid: "part-I__sec-6", heading: "Definitions", children: [] }] },
+    { eid: "part-II", heading: "Part 2", children: [{ eid: "part-II__sec-10", heading: "Enforcement", children: [] }] },
+  ],
+};
+
+const MOCK_SPLIT_PART_II_BUNDLE = {
+  ...MOCK_SPLIT_INDEX_BUNDLE_TWO_PARTS,
+  sections: { "part-II__sec-10": { heading: "Enforcement", html: "<p>Part II content</p>" } },
+  definitions: {},
+};
+
 const MOCK_SPLIT_INDEX = [
   { title: "Fair Work Act 2009", slug: "fair-work-act-2009", frbr_uri: "/akn/au/act/2009/28", split_by_part: true }
 ];
@@ -165,6 +181,67 @@ describe("ReaderView", () => {
     await wrapper.vm.$nextTick();
 
     expect(wrapper.text()).toContain("Definitions");
+    expect(wrapper.find(".load-error").exists()).toBe(false);
+  });
+
+  it("loads and renders Part II content when a TOC entry from a later Part is clicked", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url.includes("index.json")) {
+        return jsonResponse(MOCK_SPLIT_INDEX);
+      }
+      if (url.includes("/fair-work-act-2009/part-I.json")) {
+        return jsonResponse(MOCK_SPLIT_PART_BUNDLE);
+      }
+      if (url.includes("/fair-work-act-2009/part-II.json")) {
+        return jsonResponse(MOCK_SPLIT_PART_II_BUNDLE);
+      }
+      // Initial bundle fetch: /data/fair-work-act-2009.json (index bundle, empty sections)
+      return jsonResponse(MOCK_SPLIT_INDEX_BUNDLE_TWO_PARTS);
+    }));
+
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: "/reader", component: ReaderView }]
+    });
+    router.push("/reader");
+    await router.isReady();
+
+    const wrapper = mount(ReaderView, { global: { plugins: [router] } });
+    await new Promise(resolve => setTimeout(resolve, 10));
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+
+    const shortcutBtn = wrapper.find(".shortcut-btn");
+    expect(shortcutBtn.exists()).toBe(true);
+    await shortcutBtn.trigger("click");
+
+    // Wait for the index-bundle fetch and the initial Part I fetch to resolve
+    await new Promise(resolve => setTimeout(resolve, 10));
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+    await new Promise(resolve => setTimeout(resolve, 10));
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+
+    // Part I's section shows first
+    expect(wrapper.text()).toContain("Part content");
+
+    // Click the Part II TOC entry
+    const partIILeaf = wrapper.findAll(".toc-leaf").find(btn => btn.text() === "Enforcement");
+    expect(partIILeaf).toBeTruthy();
+    await partIILeaf!.trigger("click");
+
+    // Wait for the follow-up Part II fetch to resolve
+    await new Promise(resolve => setTimeout(resolve, 10));
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+    await new Promise(resolve => setTimeout(resolve, 10));
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+
+    // Part II's actual content renders, not an empty pane
+    expect(wrapper.text()).toContain("Part II content");
     expect(wrapper.find(".load-error").exists()).toBe(false);
   });
 
