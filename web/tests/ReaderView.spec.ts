@@ -45,7 +45,15 @@ const MOCK_SPLIT_INDEX = [
 // `.text()` method; ReaderView's fetchJson() checks both (see Task 13 Fix
 // Round 1 — content-type gates 404-vs-malformed-JSON classification), so
 // mocks must mirror that shape rather than just `{ ok, json }`.
-function jsonResponse(body: unknown) {
+interface MockResponse {
+  ok: boolean;
+  status?: number;
+  headers: { get: (name: string) => string | null };
+  text: () => Promise<string>;
+  json: () => Promise<unknown>;
+}
+
+function jsonResponse(body: unknown): MockResponse {
   return {
     ok: true,
     headers: { get: (name: string) => (name.toLowerCase() === "content-type" ? "application/json" : null) },
@@ -161,7 +169,7 @@ describe("ReaderView", () => {
   });
 
   it("shows an error and falls back to ActSearch when the Part fetch fails", async () => {
-    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+    vi.stubGlobal("fetch", vi.fn(async (url: string): Promise<MockResponse> => {
       if (url.includes("index.json")) {
         return jsonResponse(MOCK_SPLIT_INDEX);
       }

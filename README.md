@@ -9,6 +9,13 @@ Static site, no live backend -- a build-time pipeline joins
 [lex-au-graph](https://github.com/cchew/lex-au-graph)'s definition graph into
 per-Act JSON bundles, served from Netlify.
 
+## Deploy
+
+    cd web
+    npm run predeploy   # runs the Python build pipeline, writes web/public/data
+    npm run build        # vue-tsc + vite build
+    netlify deploy --prod
+
 ## Versions
 
 - v0.1.0 (in development): shell + legislation reader with hover-definitions.
