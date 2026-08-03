@@ -12,7 +12,7 @@ requires-python = ">=3.12"
 dependencies = [
     "lxml>=5.3",
     "typer>=0.12",
-    "lex-au-graph @ file:///Users/chingchew/Documents/Claude/Code/executive-assistant/projects/lex-au-graph/repo",
+    "lex-au-graph @ file:../../lex-au-graph/repo",
 ]
 
 [project.scripts]
