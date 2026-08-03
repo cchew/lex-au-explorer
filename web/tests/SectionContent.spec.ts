@@ -29,8 +29,49 @@ describe("SectionContent", () => {
     const html = '<p><span data-term="unresolved term">unresolved term</span></p>';
     const wrapper = mount(SectionContent, { props: { section: { heading: "X", html }, definitions: {} } });
     const term = wrapper.find('[data-term="unresolved term"]');
-    await term.trigger("mouseenter");
+    await term.trigger("mouseover");
     vi.runAllTimers();
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find(".definition-tooltip").exists()).toBe(false);
+  });
+
+  it("does not show tooltip immediately (200ms delay)", async () => {
+    const wrapper = mount(SectionContent, { props: { section: SECTION, definitions: DEFINITIONS } });
+    const term = wrapper.find('[data-term="personal information"]');
+    await term.trigger("mouseover");
+    // Advance 199ms — tooltip should NOT be visible yet
+    vi.advanceTimersByTime(199);
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find(".definition-tooltip").exists()).toBe(false);
+    // Advance 1 more ms to reach 200ms
+    vi.advanceTimersByTime(1);
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find(".definition-tooltip").exists()).toBe(true);
+  });
+
+  it("clears pending timer and hides tooltip on mouseleave", async () => {
+    const wrapper = mount(SectionContent, { props: { section: SECTION, definitions: DEFINITIONS } });
+    const term = wrapper.find('[data-term="personal information"]');
+    // Hover over and wait 100ms (halfway to 200ms)
+    await term.trigger("mouseover");
+    vi.advanceTimersByTime(100);
+    // Leave before the tooltip shows
+    await wrapper.find(".section-html").trigger("mouseout");
+    vi.advanceTimersByTime(100); // Advance past 200ms total
+    await wrapper.vm.$nextTick();
+    // Tooltip should not show because the timer was cleared
+    expect(wrapper.find(".definition-tooltip").exists()).toBe(false);
+  });
+
+  it("hides tooltip immediately when mouseout occurs after it shows", async () => {
+    const wrapper = mount(SectionContent, { props: { section: SECTION, definitions: DEFINITIONS } });
+    const term = wrapper.find('[data-term="personal information"]');
+    await term.trigger("mouseover");
+    vi.runAllTimers();
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find(".definition-tooltip").exists()).toBe(true);
+    // Now move mouse away
+    await wrapper.find(".section-html").trigger("mouseout");
     await wrapper.vm.$nextTick();
     expect(wrapper.find(".definition-tooltip").exists()).toBe(false);
   });
