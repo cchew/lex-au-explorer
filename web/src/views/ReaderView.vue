@@ -19,13 +19,18 @@ async function selectAct(slug: string) {
   try {
     const res = await fetch(`/data/${slug}.json`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data: ActBundle = await res.json();
-    bundle.value = data;
-    if (data.split_by_part) {
-      const firstPartEid = data.toc[0]?.eid;
-      if (firstPartEid) await loadPart(slug, firstPartEid);
-    } else {
-      activeSection.value = Object.keys(data.sections)[0] ?? null;
+    const text = await res.text();
+    try {
+      const data: ActBundle = JSON.parse(text);
+      bundle.value = data;
+      if (data.split_by_part) {
+        const firstPartEid = data.toc[0]?.eid;
+        if (firstPartEid) await loadPart(slug, firstPartEid);
+      } else {
+        activeSection.value = Object.keys(data.sections)[0] ?? null;
+      }
+    } catch (jsonError) {
+      throw new Error(`HTTP 404`);
     }
   } catch (e) {
     error.value = e instanceof Error ? e.message : "Failed to load Act";
