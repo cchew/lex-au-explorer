@@ -36,6 +36,7 @@ async function loadPart(slug: string, partEid: string) {
   const res = await fetch(`/data/${slug}/${partEid}.json`);
   if (!res.ok) {
     error.value = `HTTP ${res.status}`;
+    bundle.value = null;
     return;
   }
   const partData: ActBundle = await res.json();
