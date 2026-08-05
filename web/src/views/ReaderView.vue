@@ -7,6 +7,7 @@ import ActHeader from "../components/ActHeader.vue";
 import SectionContent from "../components/SectionContent.vue";
 import SourceTrustPanel from "../components/SourceTrustPanel.vue";
 import type { ActBundle, SectionEntry, TocNode } from "../types";
+import { track } from "../lib/analytics";
 
 const route = useRoute();
 const bundle = ref<ActBundle | null>(null);
@@ -51,6 +52,7 @@ async function selectAct(slug: string) {
   try {
     const data = await fetchJson<ActBundle>(`/data/${slug}.json`);
     bundle.value = data;
+    track("act_opened", { slug });
     const firstTopLevelEid = data.toc[0]?.eid ?? null;
     if (data.split_by_part) {
       if (firstTopLevelEid) await loadPart(slug, firstTopLevelEid);
@@ -59,6 +61,7 @@ async function selectAct(slug: string) {
     }
   } catch (e) {
     error.value = e instanceof Error ? e.message : "Failed to load Act";
+    track("act_load_error", { slug, error: error.value });
   }
 }
 
@@ -123,6 +126,7 @@ async function scrollToSection(eid: string) {
 
 async function selectSection(eid: string) {
   activeSection.value = eid;
+  track("toc_navigate", { slug: currentSlug.value, eid });
   const targetGroup = ownerPartEid(eid);
   if (!bundle.value?.split_by_part) {
     activeTopLevelEid.value = targetGroup;

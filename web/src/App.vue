@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const appVersion = "0.1.0";
+const appVersion = "0.1.1";
 </script>
 
 <template>
@@ -27,7 +27,7 @@ const appVersion = "0.1.0";
     </main>
     <footer class="disclaimer">
       <span>Not an official government service. AI-generated content may be inaccurate.</span>
-      <span class="version">lex-au-explorer v{{ appVersion }}</span>
+      <span class="version">v{{ appVersion }}</span>
     </footer>
   </div>
 </template>

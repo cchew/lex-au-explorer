@@ -2,6 +2,7 @@
 import { ref } from "vue";
 import DefinitionTooltip from "./DefinitionTooltip.vue";
 import type { DefinitionEntry } from "../types";
+import { track } from "../lib/analytics";
 
 const props = defineProps<{
   section: { heading: string; html: string };
@@ -16,7 +17,13 @@ function onMouseEnter(event: MouseEvent) {
   const term = target.dataset.term;
   if (!term || !props.definitions[term]) return;
   if (showTimer) clearTimeout(showTimer);
-  showTimer = setTimeout(() => { activeTerm.value = term; }, 200);
+  // Only tracked once the tooltip actually shows (past the 200ms delay),
+  // not on every mouseover -- a pass-through hover shouldn't count as a
+  // "key interaction."
+  showTimer = setTimeout(() => {
+    activeTerm.value = term;
+    track("definition_hover", { term });
+  }, 200);
 }
 
 function onMouseLeave() {

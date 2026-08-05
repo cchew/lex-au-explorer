@@ -7,6 +7,18 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <!--
+      Umami analytics: dormant until a real Website ID exists (Umami
+      Cloud free-tier limit reached as of this build). To activate,
+      uncomment and replace WEBSITE_ID with the UUID from Umami Cloud ->
+      Settings -> Websites -> lex-au-explorer -> Tracking code. No other
+      code changes needed -- src/lib/analytics.ts's track() calls are
+      already wired to every key interaction (act_opened, act_load_error,
+      toc_navigate, definition_hover, source_link_click) and no-op until
+      window.umami exists.
+
+      <script defer src="https://cloud.umami.is/script.js" data-website-id="WEBSITE_ID"></script>
+    -->
   </head>
   <body>
     <div id="app"></div>
