@@ -1,14 +1,13 @@
-# lex-au-explorer
+# Lex AU Explorer
 
-Public showcase site for the [AU Legislative Intelligence Stack](https://github.com/cchew/lex-au) --
-browse Commonwealth legislation with hover-definitions for defined terms,
-correctly scoped to the section you're reading.
+Showcase site and tools for [lex-au](https://github.com/cchew/lex-au), [lex-au-search](https://github.com/cchew/lex-au-search) and [lex-au-graph](https://github.com/cchew/lex-au-graph).
 
-Static site, no live backend -- a build-time pipeline joins
-[lex-au](https://github.com/cchew/lex-au)'s corpus with
-[lex-au-graph](https://github.com/cchew/lex-au-graph)'s definition graph into
-per-Act JSON bundles, served from Netlify.
+Current features:
 
+1. Browse Commonwealth legislation with hover-definitions for defined terms
+## Versions
+
+- v0.1.0: shell + legislation reader with hover-definitions, section-scoped hover tooltips, 
 ## Deploy
 
 Netlify does not run the build: its build container has neither the sibling
@@ -21,8 +20,5 @@ Vite bundling `public/`) deployed as a pre-built directory.
     npm run build               # vue-tsc + vite build; bakes public/data into dist/
     netlify deploy --prod --dir=dist   # deploys the pre-built dist/, no remote build
 
-## Versions
-
-- v0.1.0: shell + legislation reader with hover-definitions, section-scoped hover tooltips, source-fidelity panel. Real corpus build verified (3,078 Acts, zero failures). Not yet deployed.
-
-MIT licensed.
+## License
+MIT

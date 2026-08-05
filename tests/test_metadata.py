@@ -13,6 +13,8 @@ def test_load_corpus_index_parses_acts():
     assert privacy.comp_id == "C2026C00227"
     assert privacy.effective_date == "2026-06-04"
     assert privacy.legislation_url == "https://www.legislation.gov.au/C2004A03712/latest/text"
+    assert privacy.year == 1988
+    assert privacy.number == 119
 
 
 def test_load_corpus_index_flags_split_by_part_by_source_size(tmp_path):
@@ -38,6 +40,6 @@ def test_load_corpus_index_flags_split_by_part_by_source_size(tmp_path):
 def test_build_site_index_shape():
     acts = load_corpus_index(FIXTURES / "mini-corpus-index.json", xml_dir=FIXTURES / "xml")
     site_index = build_site_index(acts)
-    assert {"title", "slug", "frbr_uri", "split_by_part"} <= set(site_index[0])
+    assert {"title", "slug", "frbr_uri", "split_by_part", "year", "number"} <= set(site_index[0])
     titles = {e["title"] for e in site_index}
     assert titles == {"Privacy Act 1988", "Income Tax Assessment Act 1997"}

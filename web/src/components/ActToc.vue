@@ -16,7 +16,12 @@ const emit = defineEmits<{ select: [eid: string] }>();
         @click="emit('select', node.eid)"
       >{{ node.heading }}</button>
       <template v-else>
-        <span class="toc-branch">{{ node.heading }}</span>
+        <button
+          type="button"
+          class="toc-branch"
+          :class="{ active: node.eid === activeEid }"
+          @click="emit('select', node.eid)"
+        >{{ node.heading }}</button>
         <ActToc :nodes="node.children" :active-eid="activeEid" @select="emit('select', $event)" />
       </template>
     </li>
@@ -27,7 +32,24 @@ const emit = defineEmits<{ select: [eid: string] }>();
 .toc-list { list-style: none; padding-left: var(--s-3); }
 .toc-list:first-of-type { padding-left: 0; }
 
-.toc-branch { display: block; font-size: 0.75rem; font-weight: 600; color: var(--color-ink-2); margin-top: var(--s-2); }
+.toc-branch {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: var(--s-1) var(--s-2);
+  margin-top: var(--s-2);
+  border: none;
+  background: none;
+  color: var(--color-ink-2);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.toc-branch:hover { background: var(--color-surface-hover); color: var(--color-ink); }
+.toc-branch.active { background: var(--color-surface-active); color: var(--color-ink); }
 
 .toc-leaf {
   display: block;

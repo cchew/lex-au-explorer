@@ -8,6 +8,7 @@ def test_assemble_bundle_shape():
         slug="privacy-act-1988", name="Privacy Act 1988", title_id="C2004A03712",
         comp_id="C2026C00227", effective_date="2026-06-04",
         xml_path=Path("x.xml"), split_by_part=False, frbr_uri="/akn/au/act/1988/119",
+        year=1988, number=119,
     )
     toc = [{"eid": "part-I", "heading": "Part 1", "children": []}]
     sections = {"part-I__sec-6": {"heading": "Definitions", "html": "<p>...</p>"}}
@@ -21,6 +22,8 @@ def test_assemble_bundle_shape():
     assert bundle["legislation_url"] == "https://www.legislation.gov.au/C2004A03712/latest/text"
     assert bundle["comp_id"] == "C2026C00227"
     assert bundle["effective_date"] == "2026-06-04"
+    assert bundle["year"] == 1988
+    assert bundle["number"] == 119
     assert bundle["toc"] == toc
     assert bundle["sections"] == sections
     assert bundle["definitions"] == definitions

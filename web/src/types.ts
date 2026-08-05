@@ -28,6 +28,8 @@ export interface ActBundle {
   legislation_url: string;
   comp_id: string;
   effective_date: string;
+  year: number;
+  number: number;
   toc: TocNode[];
   sections: Record<string, SectionEntry>;
   definitions: Record<string, DefinitionEntry>;

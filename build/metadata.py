@@ -30,6 +30,8 @@ class ActMeta:
     effective_date: str
     xml_path: Path
     split_by_part: bool
+    year: int
+    number: int
     frbr_uri: str = ""  # populated by Task 5's XML parse, empty until then
 
     @property
@@ -51,6 +53,8 @@ def load_corpus_index(index_path: Path, xml_dir: Path) -> dict[str, ActMeta]:
             effective_date=entry["effective_date"],
             xml_path=xml_path,
             split_by_part=size >= _SPLIT_BY_PART_THRESHOLD_BYTES,
+            year=entry["year"],
+            number=entry["number"],
             frbr_uri=_parse_frbr_uri(xml_path),
         )
     return result
@@ -63,6 +67,8 @@ def build_site_index(acts: dict[str, ActMeta]) -> list[dict]:
             "slug": a.slug,
             "frbr_uri": a.frbr_uri,
             "split_by_part": a.split_by_part,
+            "year": a.year,
+            "number": a.number,
         }
         for a in sorted(acts.values(), key=lambda a: a.name)
     ]

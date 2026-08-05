@@ -16,6 +16,8 @@ def assemble_bundle(
         "legislation_url": meta.legislation_url,
         "comp_id": meta.comp_id,
         "effective_date": meta.effective_date,
+        "year": meta.year,
+        "number": meta.number,
         "toc": toc,
         "sections": sections,
         "definitions": definitions,

@@ -1,15 +1,17 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, computed, nextTick, onMounted } from "vue";
 import { useRoute } from "vue-router";
 import ActSearch from "../components/ActSearch.vue";
 import ActToc from "../components/ActToc.vue";
+import ActHeader from "../components/ActHeader.vue";
 import SectionContent from "../components/SectionContent.vue";
 import SourceTrustPanel from "../components/SourceTrustPanel.vue";
-import type { ActBundle } from "../types";
+import type { ActBundle, SectionEntry, TocNode } from "../types";
 
 const route = useRoute();
 const bundle = ref<ActBundle | null>(null);
 const activeSection = ref<string | null>(null);
+const activeTopLevelEid = ref<string | null>(null);
 const error = ref<string | null>(null);
 const currentSlug = ref<string | null>(null);
 const loadedPartEid = ref<string | null>(null);
@@ -43,16 +45,17 @@ async function selectAct(slug: string) {
   error.value = null;
   bundle.value = null;
   activeSection.value = null;
+  activeTopLevelEid.value = null;
   currentSlug.value = slug;
   loadedPartEid.value = null;
   try {
     const data = await fetchJson<ActBundle>(`/data/${slug}.json`);
     bundle.value = data;
+    const firstTopLevelEid = data.toc[0]?.eid ?? null;
     if (data.split_by_part) {
-      const firstPartEid = data.toc[0]?.eid;
-      if (firstPartEid) await loadPart(slug, firstPartEid);
+      if (firstTopLevelEid) await loadPart(slug, firstTopLevelEid);
     } else {
-      activeSection.value = Object.keys(data.sections)[0] ?? null;
+      activeTopLevelEid.value = firstTopLevelEid;
     }
   } catch (e) {
     error.value = e instanceof Error ? e.message : "Failed to load Act";
@@ -66,37 +69,74 @@ async function loadPart(slug: string, partEid: string) {
       bundle.value = { ...bundle.value, sections: partData.sections, definitions: partData.definitions };
     }
     loadedPartEid.value = partEid;
-    activeSection.value = Object.keys(partData.sections)[0] ?? null;
+    activeTopLevelEid.value = partEid;
   } catch (e) {
     error.value = e instanceof Error ? e.message : "Failed to load Act";
     bundle.value = null;
   }
 }
 
-// AKN eId convention: a section's owning top-level Part is the first
+// AKN eId convention: a node's owning top-level TOC group (Part, or the
+// node itself for an Act with no Part wrapper) is the first
 // "__"-delimited segment (e.g. "part-II__dvs-1__sec-6AA" -> "part-II"),
 // matching lex-au-graph's containment-prefix derivation in resolver.py.
-// The Part node's own eid (e.g. "part-II") has no "__" at all, so it is
-// already its own owning Part.
+// A top-level node's own eid (e.g. "part-II") has no "__" at all, so it
+// is already its own group.
 function ownerPartEid(eid: string): string {
   // String.split always returns at least one element; the fallback is
   // unreachable but satisfies noUncheckedIndexedAccess.
   return eid.split("__", 1)[0] ?? eid;
 }
 
-async function selectSection(eid: string) {
-  if (!bundle.value?.split_by_part) {
-    activeSection.value = eid;
+function flattenLeafEids(node: TocNode): string[] {
+  if (node.children.length === 0) return [node.eid];
+  const eids: string[] = [];
+  for (const child of node.children) eids.push(...flattenLeafEids(child));
+  return eids;
+}
+
+// All sections belonging to the currently active top-level TOC group, in
+// document order -- the content pane shows a whole group at once (e.g.
+// every section under "Preliminary") rather than one section in
+// isolation, so a sidebar click on a specific section only needs to
+// scroll to it, not replace the pane.
+const visibleSections = computed((): { eid: string; section: SectionEntry }[] => {
+  if (!bundle.value || !activeTopLevelEid.value) return [];
+  const topNode = bundle.value.toc.find((n) => n.eid === activeTopLevelEid.value);
+  if (!topNode) return [];
+  const result: { eid: string; section: SectionEntry }[] = [];
+  for (const eid of flattenLeafEids(topNode)) {
+    const section = bundle.value.sections[eid];
+    if (section) result.push({ eid, section });
+  }
+  return result;
+});
+
+async function scrollToSection(eid: string) {
+  await nextTick();
+  if (eid === activeTopLevelEid.value) {
+    document.querySelector(".content-pane")?.scrollIntoView({ behavior: "smooth", block: "start" });
     return;
   }
-  const targetPart = ownerPartEid(eid);
-  if (targetPart === loadedPartEid.value) {
-    activeSection.value = eid;
+  document.getElementById(eid)?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function selectSection(eid: string) {
+  activeSection.value = eid;
+  const targetGroup = ownerPartEid(eid);
+  if (!bundle.value?.split_by_part) {
+    activeTopLevelEid.value = targetGroup;
+    await scrollToSection(eid);
+    return;
+  }
+  if (targetGroup === loadedPartEid.value) {
+    activeTopLevelEid.value = targetGroup;
+    await scrollToSection(eid);
     return;
   }
   if (currentSlug.value) {
-    await loadPart(currentSlug.value, targetPart);
-    activeSection.value = eid;
+    await loadPart(currentSlug.value, targetGroup);
+    await scrollToSection(eid);
   }
 }
 
@@ -115,12 +155,11 @@ onMounted(() => {
         <ActToc :nodes="bundle.toc" :active-eid="activeSection" @select="selectSection" />
       </aside>
       <div class="content-pane">
+        <ActHeader :bundle="bundle" />
         <SourceTrustPanel :bundle="bundle" />
-        <SectionContent
-          v-if="activeSection && bundle.sections[activeSection]"
-          :section="bundle.sections[activeSection]!"
-          :definitions="bundle.definitions"
-        />
+        <div v-for="s in visibleSections" :key="s.eid" :id="s.eid" class="section-anchor">
+          <SectionContent :section="s.section" :definitions="bundle.definitions" />
+        </div>
       </div>
     </div>
   </div>
@@ -141,4 +180,7 @@ onMounted(() => {
 }
 
 .content-pane { min-width: 0; }
+
+.section-anchor { scroll-margin-top: var(--s-4); }
+.section-anchor + .section-anchor { margin-top: var(--s-5); padding-top: var(--s-5); border-top: 1px solid var(--color-border); }
 </style>
