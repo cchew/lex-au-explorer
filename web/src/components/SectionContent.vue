@@ -47,4 +47,9 @@ function onMouseLeave() {
 .section-content h3 { font-size: 1rem; margin-bottom: var(--s-3); color: var(--color-ink); }
 .section-html :deep(p) { margin-bottom: var(--s-3); font-size: 0.875rem; line-height: 1.7; color: var(--color-ink); }
 .section-html :deep([data-term]) { border-bottom: 1px dashed var(--color-accent-border); cursor: help; }
+.section-html :deep(.akn-unit) { padding-left: var(--s-4); border-left: 1px solid var(--color-border); margin-bottom: var(--s-3); }
+.section-html :deep(.akn-unit .akn-unit) { margin-bottom: 0; }
+.section-html :deep(.akn-num) { font-weight: 500; color: var(--color-ink-2); }
+.section-html :deep(.akn-note) { font-size: 0.8125rem; color: var(--color-ink-3); font-style: italic; }
+.section-html :deep(.akn-note p) { margin-bottom: var(--s-2); }
 </style>

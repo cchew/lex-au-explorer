@@ -37,6 +37,30 @@
             <p><term refersTo="#term-sensitive-information">sensitive information</term> means <def>information or an opinion about an individual's racial or ethnic origin, political opinions, or health information.</def></p>
           </content>
         </section>
+        <section eId="part-I__sec-5B">
+          <num>5B</num>
+          <heading>Extra-territorial operation of Act</heading>
+          <content>
+            <p>Agencies</p>
+          </content>
+          <subsection eId="part-I__sec-5B__subsec-1">
+            <num>1</num>
+            <content>
+              <p>This Act extends to an act done, or practice engaged in, outside Australia by an agency.</p>
+            </content>
+            <authorialNote placement="end" eId="note-5" marker="5">
+              <content>
+                <p>Note:	The act or practice overseas will not breach an Australian Privacy Principle.</p>
+              </content>
+            </authorialNote>
+          </subsection>
+          <subsection eId="part-I__sec-5B__subsec-2">
+            <num>2</num>
+            <content>
+              <p>	(2)	An organisation has an <b><i>Australian link</i></b> if the organisation is an Australian citizen.</p>
+            </content>
+          </subsection>
+        </section>
         <section eId="part-I__sec-13">
           <num>13</num>
           <heading>Interferences with privacy</heading>
