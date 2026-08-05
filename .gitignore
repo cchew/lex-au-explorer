@@ -5,3 +5,6 @@ web/node_modules/
 web/dist/
 web/data/
 *.egg-info/
+
+# Local Netlify folder
+.netlify
