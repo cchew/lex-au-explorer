@@ -4,7 +4,11 @@ __pycache__/
 web/node_modules/
 web/dist/
 web/data/
+web/test-results/
 *.egg-info/
 
 # Local Netlify folder
 .netlify
+
+# Atomic-write scratch file from lex-au-explorer-verify
+web/verification.json.tmp

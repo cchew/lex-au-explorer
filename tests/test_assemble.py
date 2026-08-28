@@ -29,3 +29,18 @@ def test_assemble_bundle_shape():
     assert bundle["definitions"] == definitions
     assert bundle["raw_xml_url"] == "/data/privacy-act-1988.xml"
     assert bundle["split_by_part"] is False
+    assert "verification" not in bundle
+
+
+def test_assemble_bundle_includes_verification_when_provided():
+    meta = ActMeta(
+        slug="privacy-act-1988", name="Privacy Act 1988", title_id="C2004A03712",
+        comp_id="C2026C00227", effective_date="2026-06-04",
+        xml_path=Path("x.xml"), split_by_part=False, frbr_uri="/akn/au/act/1988/119",
+        year=1988, number=119,
+    )
+    verification = {"status": "current", "checked_at": "2026-08-28"}
+
+    bundle = assemble_bundle(meta, [], {}, {}, verification=verification)
+
+    assert bundle["verification"] == verification

@@ -27,6 +27,65 @@ def test_build_site_writes_index_and_bundle(tmp_path):
     assert "part-I__sec-6" in bundle["sections"]
 
 
+def test_build_site_embeds_verification_and_recomputes_against_current_compilation(tmp_path):
+    out_dir = tmp_path / "data"
+    verification = tmp_path / "verification.json"
+    verification.write_text(
+        json.dumps(
+            {
+                "generated_at": "2026-08-28",
+                "acts": {
+                    # live compilation differs from the corpus copy -> stale
+                    "C2004A03712": {
+                        "checked_at": "2026-08-28",
+                        "repealed": False,
+                        "live_comp_id": "C2026C00301",
+                        "live_effective_date": "2026-07-01",
+                    },
+                    # stored observation now matches the corpus comp_id -> recomputed current
+                    "C2004A05138": {
+                        "checked_at": "2026-08-28",
+                        "repealed": False,
+                        "live_comp_id": "C2026C00100",
+                        "live_effective_date": "2026-01-01",
+                    },
+                },
+            }
+        )
+    )
+
+    build_site(
+        corpus_index=FIXTURES / "mini-corpus-index.json",
+        xml_dir=FIXTURES / "xml",
+        graph_path=None,
+        out_dir=out_dir,
+        verification_path=verification,
+    )
+
+    privacy = json.loads((out_dir / "privacy-act-1988.json").read_text())
+    assert privacy["verification"] == {
+        "status": "stale",
+        "checked_at": "2026-08-28",
+        "live_comp_id": "C2026C00301",
+        "live_effective_date": "2026-07-01",
+    }
+
+    itaa = json.loads((out_dir / "income-tax-assessment-act-1997.json").read_text())
+    assert itaa["verification"] == {"status": "current", "checked_at": "2026-08-28"}
+
+
+def test_build_site_omits_verification_when_no_file_given(tmp_path):
+    out_dir = tmp_path / "data"
+    build_site(
+        corpus_index=FIXTURES / "mini-corpus-index.json",
+        xml_dir=FIXTURES / "xml",
+        graph_path=None,
+        out_dir=out_dir,
+    )
+    privacy = json.loads((out_dir / "privacy-act-1988.json").read_text())
+    assert "verification" not in privacy
+
+
 def test_cli_entry_point_invokes_build_site(tmp_path):
     """Exercises the actual Typer `app` the installed console-script calls,
     not just build_site() directly -- this is what would have caught the
@@ -122,6 +181,28 @@ def test_write_split_bundle_writes_one_file_per_part_plus_index(tmp_path):
     assert index_bundle["sections"] == {}
     assert index_bundle["definitions"] == {}
     assert index_bundle["title"] == "Big Act"
+
+
+def test_write_split_bundle_carries_verification_into_every_part_and_index(tmp_path):
+    toc = [{"eid": "part-I", "heading": "Part I", "children": [
+        {"eid": "part-I__sec-1", "heading": "sec 1", "children": []},
+    ]}]
+    sections = {"part-I__sec-1": {"heading": "sec 1", "html": "<p>one</p>"}}
+    bundle_meta = {
+        "title": "Big Act", "split_by_part": True, "toc": toc,
+        "sections": sections, "definitions": {},
+        "verification": {"status": "stale", "checked_at": "2026-08-28",
+                         "live_comp_id": "C2026C00301", "live_effective_date": "2026-07-01"},
+    }
+    out_dir = tmp_path / "data"
+    out_dir.mkdir()
+
+    _write_split_bundle(out_dir, "big-act", toc, sections, {}, bundle_meta)
+
+    part_i = json.loads((out_dir / "big-act" / "part-I.json").read_text())
+    index_bundle = json.loads((out_dir / "big-act.json").read_text())
+    assert part_i["verification"]["status"] == "stale"
+    assert index_bundle["verification"]["status"] == "stale"
 
 
 def test_installed_console_script_help_does_not_crash():

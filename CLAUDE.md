@@ -17,6 +17,10 @@ Applications: this repo -- the first public-facing showcase surface for the stac
     pip install -e ".[dev]"
     lex-au-explorer-build --corpus-dir ../../lex-au/repo/corpus --graph ../../lex-au-graph/repo/graph.json --out web/data
 
+`build/verification.py` + `lex-au-explorer-verify` do an out-of-band currency
+check against legislation.gov.au's OData API, writing `web/verification.json`.
+The build reads that file (no network); it does not call the API itself.
+
 ## Frontend
 
     cd web && npm install && npm run dev

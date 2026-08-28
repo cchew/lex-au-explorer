@@ -6,5 +6,6 @@
   "sections": { "part-I__sec-6": { "heading": "Definitions", "html": "<p>See <span data-term=\"personal information\">personal information</span>.</p>" } },
   "definitions": { "personal information": { "text": "means information about an identified individual.", "section_eid": "part-I__sec-6" } },
   "raw_xml_url": "/data/privacy-act-1988.xml",
-  "split_by_part": false
+  "split_by_part": false,
+  "verification": { "status": "current", "checked_at": "2026-08-28" }
 }

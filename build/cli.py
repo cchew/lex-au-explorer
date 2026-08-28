@@ -10,6 +10,9 @@ import typer
 from build.metadata import load_corpus_index, build_site_index, ActMeta
 from build.bundle import build_toc, build_sections
 from build.assemble import assemble_bundle
+from build.verification import derive_status
+
+DEFAULT_VERIFICATION_PATH = Path("web/verification.json")
 
 app = typer.Typer()
 
@@ -19,6 +22,7 @@ def build_site(
     xml_dir: Path,
     graph_path: Optional[Path],
     out_dir: Path,
+    verification_path: Optional[Path] = None,
 ) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     acts = load_corpus_index(corpus_index, xml_dir=xml_dir)
@@ -28,6 +32,10 @@ def build_site(
         from lexaugraph.graph import LexAuGraph
         from lexaugraph.resolver import DefinitionResolver
         resolver = DefinitionResolver(LexAuGraph.load(graph_path))
+
+    verification_entries: dict[str, dict] = {}
+    if verification_path is not None and verification_path.exists():
+        verification_entries = json.loads(verification_path.read_text()).get("acts", {})
 
     for meta in acts.values():
         if not meta.xml_path.exists():
@@ -42,7 +50,8 @@ def build_site(
         toc = build_toc(root)
         sections = build_sections(root)
         definitions = _resolve_all_definitions(resolver, meta.frbr_uri, sections) if resolver else {}
-        bundle = assemble_bundle(meta, toc, sections, definitions)
+        verification = derive_status(verification_entries.get(meta.title_id), meta.comp_id)
+        bundle = assemble_bundle(meta, toc, sections, definitions, verification=verification)
 
         if meta.split_by_part:
             _write_split_bundle(out_dir, meta.slug, toc, sections, definitions, bundle)
@@ -117,11 +126,23 @@ def main(
     corpus_dir: Path = typer.Option(..., "--corpus-dir", help="Path to lex-au's corpus/ directory"),
     graph: Optional[Path] = typer.Option(None, "--graph", help="Path to lex-au-graph's graph.json"),
     out: Path = typer.Option(Path("web/data"), "--out", help="Output directory for generated JSON"),
+    verification: Optional[Path] = typer.Option(
+        None,
+        "--verification",
+        help=(
+            "Path to a verification.json written by lex-au-explorer-verify. "
+            f"Defaults to {DEFAULT_VERIFICATION_PATH} when it exists. No network access."
+        ),
+    ),
 ) -> None:
+    verification_path = verification or DEFAULT_VERIFICATION_PATH
+    if not verification_path.exists():
+        verification_path = None
     build_site(
         corpus_index=corpus_dir / "index.json",
         xml_dir=corpus_dir / "xml",
         graph_path=graph,
         out_dir=out,
+        verification_path=verification_path,
     )
     typer.echo(f"Site data written to {out}")

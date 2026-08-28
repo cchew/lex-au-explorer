@@ -5,9 +5,11 @@ Showcase site and tools for [lex-au](https://github.com/cchew/lex-au), [lex-au-s
 Current features:
 
 1. Browse Commonwealth legislation with hover-definitions for defined terms
+2. Source-fidelity panel with a build-time currency check against legislation.gov.au ("verified DATE: current compilation" / "a newer compilation now exists" / "repealed since this snapshot")
 
 ## Versions
 
+- v0.1.2: source-fidelity panel now carries a build-time currency check against legislation.gov.au, refreshed out-of-band by `lex-au-explorer-verify` (no network access in the build).
 - v0.1.1: fixes section rendering to include subsection/paragraph/authorial-note body text, not just a section's own top-level content (52% of Privacy Act 1988 sections were rendering under 30 chars of body text). Reader now shows a whole TOC group's sections at once with scroll-to-anchor navigation, plus an Act key-info header (title, No., year). Rebranded shell, Umami analytics wired (dormant pending a Website ID).
 - v0.1.0: shell + legislation reader with hover-definitions, section-scoped hover tooltips, source-fidelity panel. Real corpus build verified (3,078 Acts, zero failures).
 
@@ -22,6 +24,26 @@ Vite bundling `public/`) deployed as a pre-built directory.
     npm run predeploy          # runs the Python build pipeline, writes web/public/data
     npm run build               # vue-tsc + vite build; bakes public/data into dist/
     netlify deploy --prod --dir=dist   # deploys the pre-built dist/, no remote build
+
+## Source-fidelity verification
+
+`web/verification.json` records, per Act, whether the corpus copy is still the
+current in-force compilation on legislation.gov.au. The build reads that file
+and bakes a status into each Act bundle; **the build itself never touches the
+network**. Refresh it when you want a fresh "verified" claim in the reader,
+typically just before a deploy:
+
+    lex-au-explorer-verify --corpus-dir ../../lex-au/repo/corpus
+
+One bulk "what changed since the corpus was built" query, then a targeted
+check per changed Act; every other Act is recorded as inferred-current. Failed
+per-Act checks keep the previous observation (with its older date) rather than
+losing it, so an interrupted or partly-offline run is safe to re-run. `--delay`
+(default 1.5s) paces calls to the government API.
+
+Known limitation: repeal is only detected for Acts that also had a compilation
+change; a repealed Act with no final compilation still reads as current until
+the next corpus re-ingest drops it.
 
 ## License
 MIT

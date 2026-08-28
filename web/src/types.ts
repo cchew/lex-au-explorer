@@ -21,6 +21,13 @@ export interface DefinitionEntry {
   section_eid: string;
 }
 
+export interface VerificationInfo {
+  status: "current" | "stale" | "repealed";
+  checked_at: string;
+  live_comp_id?: string;
+  live_effective_date?: string;
+}
+
 export interface ActBundle {
   frbr_uri: string;
   title: string;
@@ -35,4 +42,5 @@ export interface ActBundle {
   definitions: Record<string, DefinitionEntry>;
   raw_xml_url: string;
   split_by_part: boolean;
+  verification?: VerificationInfo;
 }

@@ -8,8 +8,9 @@ def assemble_bundle(
     toc: list[dict],
     sections: dict[str, dict],
     definitions: dict[str, dict],
+    verification: dict | None = None,
 ) -> dict[str, Any]:
-    return {
+    bundle = {
         "frbr_uri": meta.frbr_uri,
         "title": meta.name,
         "title_id": meta.title_id,
@@ -24,3 +25,6 @@ def assemble_bundle(
         "raw_xml_url": f"/data/{meta.slug}.xml",
         "split_by_part": meta.split_by_part,
     }
+    if verification is not None:
+        bundle["verification"] = verification
+    return bundle
