@@ -1,4 +1,23 @@
 {
-  "generated_at": null,
-  "acts": {}
+  "acts": {
+    "F1996B00406": {
+      "checked_at": "2026-08-28",
+      "live_comp_id": "F2026C00767",
+      "live_effective_date": "2026-07-24",
+      "repealed": false
+    },
+    "F2001B00274": {
+      "checked_at": "2026-08-28",
+      "live_comp_id": "F2026C00828",
+      "live_effective_date": "2026-08-11",
+      "repealed": false
+    },
+    "F2025L00178": {
+      "checked_at": "2026-08-28",
+      "live_comp_id": "F2026C00775",
+      "live_effective_date": "2026-07-23",
+      "repealed": false
+    }
+  },
+  "generated_at": "2026-08-28"
 }

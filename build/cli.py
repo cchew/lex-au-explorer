@@ -34,8 +34,11 @@ def build_site(
         resolver = DefinitionResolver(LexAuGraph.load(graph_path))
 
     verification_entries: dict[str, dict] = {}
+    verification_ran_at: Optional[str] = None
     if verification_path is not None and verification_path.exists():
-        verification_entries = json.loads(verification_path.read_text()).get("acts", {})
+        _vdata = json.loads(verification_path.read_text())
+        verification_entries = _vdata.get("acts", {})
+        verification_ran_at = _vdata.get("generated_at")
 
     for meta in acts.values():
         if not meta.xml_path.exists():
@@ -50,7 +53,9 @@ def build_site(
         toc = build_toc(root)
         sections = build_sections(root)
         definitions = _resolve_all_definitions(resolver, meta.frbr_uri, sections) if resolver else {}
-        verification = derive_status(verification_entries.get(meta.title_id), meta.comp_id)
+        verification = derive_status(
+            verification_entries.get(meta.title_id), meta.comp_id, ran_at=verification_ran_at
+        )
         bundle = assemble_bundle(meta, toc, sections, definitions, verification=verification)
 
         if meta.split_by_part:

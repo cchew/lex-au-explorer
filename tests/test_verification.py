@@ -143,10 +143,6 @@ def test_check_act_flags_repealed_when_title_row_absent():
     assert entry == {"checked_at": "2026-08-28", "repealed": True}
 
 
-def test_derive_status_none_when_no_entry():
-    assert derive_status(None, "C2026C00227") is None
-
-
 def test_derive_status_current_when_live_matches_current_corpus_compilation():
     entry = {
         "checked_at": "2026-08-28",
@@ -195,9 +191,15 @@ def test_derive_status_repealed():
     }
 
 
-def test_derive_status_inferred_entry_is_current():
-    entry = {"checked_at": "2026-08-28", "repealed": False, "inferred": True}
-    assert derive_status(entry, "C2026C00227") == {
+def test_derive_status_none_when_no_entry_and_no_run():
+    assert derive_status(None, "C2026C00227") is None
+    assert derive_status(None, "C2026C00227", ran_at=None) is None
+
+
+def test_derive_status_current_for_absent_entry_after_a_completed_run():
+    """A completed run records only the exceptions; every Act it did not
+    flag is current as of the run date."""
+    assert derive_status(None, "C2026C00227", ran_at="2026-08-28") == {
         "status": "current",
         "checked_at": "2026-08-28",
     }
@@ -226,11 +228,12 @@ class ScriptedClient:
     """Routes ``.get`` by endpoint + filter to a handler, so a whole
     verification run can be driven without HTTP."""
 
-    def __init__(self, changed_title_ids, titles, versions, fail_title_ids=()):
+    def __init__(self, changed_title_ids, titles, versions, fail_title_ids=(), interrupt_title_ids=()):
         self._changed = list(changed_title_ids)
         self._titles = titles  # title_id -> {"isInForce": bool}
         self._versions = versions  # title_id -> {"registerId", "start"}
         self._fail = set(fail_title_ids)
+        self._interrupt = set(interrupt_title_ids)
         self.calls = []
 
     def get(self, path, params=None):
@@ -240,6 +243,8 @@ class ScriptedClient:
             return {"value": [{"titleId": t} for t in self._changed]}
         if path == "Titles":
             tid = flt.split("id eq '")[1].split("'")[0]
+            if tid in self._interrupt:
+                raise KeyboardInterrupt
             if tid in self._fail:
                 import requests
 
@@ -253,7 +258,7 @@ class ScriptedClient:
         raise AssertionError(f"unrouted call: {path} {params}")
 
 
-def test_run_verification_observes_changed_acts_and_infers_the_rest(tmp_path):
+def test_run_verification_records_only_exceptions_not_the_current_majority(tmp_path):
     out = tmp_path / "verification.json"
     corpus_index = tmp_path / "index.json"
     corpus_index.write_text(json.dumps(CORPUS_INDEX))
@@ -272,18 +277,38 @@ def test_run_verification_observes_changed_acts_and_infers_the_rest(tmp_path):
 
     data = json.loads(out.read_text())
     assert data["generated_at"] == "2026-08-28"
-    assert data["acts"]["C2004A03712"] == {
-        "checked_at": "2026-08-28",
-        "repealed": False,
-        "live_comp_id": "C2026C00301",
-        "live_effective_date": "2026-07-01",
-    }
-    assert data["acts"]["C2004A05138"] == {
-        "checked_at": "2026-08-28",
-        "repealed": False,
-        "inferred": True,
+    # only the stale Act is written; the inferred-current majority is not
+    assert data["acts"] == {
+        "C2004A03712": {
+            "checked_at": "2026-08-28",
+            "repealed": False,
+            "live_comp_id": "C2026C00301",
+            "live_effective_date": "2026-07-01",
+        }
     }
     assert summary == {"current": 0, "stale": 1, "repealed": 0, "inferred": 1, "unverified": 0}
+
+
+def test_run_verification_omits_a_changed_act_that_is_actually_current(tmp_path):
+    out = tmp_path / "verification.json"
+    corpus_index = tmp_path / "index.json"
+    corpus_index.write_text(json.dumps(CORPUS_INDEX))
+
+    client = ScriptedClient(
+        changed_title_ids=["C2004A03712"],
+        titles={"C2004A03712": {"isInForce": True}},
+        versions={
+            # live compilation equals the corpus copy -> nothing to record
+            "C2004A03712": {"registerId": "C2026C00227", "start": "2026-06-04T00:00:00+10:00"}
+        },
+    )
+
+    summary = run_verification(
+        corpus_index, out, client=client, delay=0, today=date(2026, 8, 28)
+    )
+
+    assert json.loads(out.read_text())["acts"] == {}
+    assert summary["current"] == 1
 
 
 def test_run_verification_keeps_prior_entry_when_a_check_fails(tmp_path):
@@ -323,30 +348,31 @@ def test_run_verification_keeps_prior_entry_when_a_check_fails(tmp_path):
     assert summary["unverified"] == 1
 
 
-def test_run_verification_drops_prior_inferred_entry_when_a_check_fails(tmp_path):
-    """A prior inferred-current entry must not be carried forward for an Act
-    that is now in the changed set -- it would assert currency we no longer
-    have grounds for."""
+def test_run_verification_leaves_generated_at_null_when_interrupted(tmp_path):
+    """An interrupted run must not stamp generated_at -- a partial exception
+    list must not read as an authoritative 'everything else is current'."""
     out = tmp_path / "verification.json"
-    out.write_text(
-        json.dumps(
-            {
-                "generated_at": "2026-08-20",
-                "acts": {"C2004A03712": {"checked_at": "2026-08-20", "repealed": False, "inferred": True}},
-            }
-        )
-    )
     corpus_index = tmp_path / "index.json"
     corpus_index.write_text(json.dumps(CORPUS_INDEX))
 
     client = ScriptedClient(
-        changed_title_ids=["C2004A03712"], titles={}, versions={}, fail_title_ids=["C2004A03712"]
+        changed_title_ids=["C2004A03712", "C2004A05138"],
+        titles={"C2004A03712": {"isInForce": True}},
+        versions={
+            "C2004A03712": {"registerId": "C2026C00301", "start": "2026-07-01T00:00:00+00:00"}
+        },
+        interrupt_title_ids=["C2004A05138"],
     )
 
-    run_verification(corpus_index, out, client=client, delay=0, today=date(2026, 8, 28))
+    with pytest.raises(KeyboardInterrupt):
+        run_verification(
+            corpus_index, out, client=client, delay=0, today=date(2026, 8, 28), flush_every=1
+        )
 
     data = json.loads(out.read_text())
-    assert "C2004A03712" not in data["acts"]
+    assert data["generated_at"] is None
+    # the stale Act found before the interrupt is still persisted for the next run
+    assert data["acts"]["C2004A03712"]["live_comp_id"] == "C2026C00301"
 
 
 def test_run_verification_counts_repealed(tmp_path):
@@ -384,3 +410,5 @@ def test_run_verification_tolerates_missing_updated_at(tmp_path):
     )
 
     assert summary["inferred"] == 2
+    data = json.loads(out.read_text())
+    assert data == {"generated_at": "2026-08-28", "acts": {}}

@@ -27,7 +27,7 @@ def test_build_site_writes_index_and_bundle(tmp_path):
     assert "part-I__sec-6" in bundle["sections"]
 
 
-def test_build_site_embeds_verification_and_recomputes_against_current_compilation(tmp_path):
+def test_build_site_flags_a_recorded_exception_and_infers_current_for_the_rest(tmp_path):
     out_dir = tmp_path / "data"
     verification = tmp_path / "verification.json"
     verification.write_text(
@@ -35,20 +35,13 @@ def test_build_site_embeds_verification_and_recomputes_against_current_compilati
             {
                 "generated_at": "2026-08-28",
                 "acts": {
-                    # live compilation differs from the corpus copy -> stale
+                    # the only recorded exception -> stale
                     "C2004A03712": {
                         "checked_at": "2026-08-28",
                         "repealed": False,
                         "live_comp_id": "C2026C00301",
                         "live_effective_date": "2026-07-01",
-                    },
-                    # stored observation now matches the corpus comp_id -> recomputed current
-                    "C2004A05138": {
-                        "checked_at": "2026-08-28",
-                        "repealed": False,
-                        "live_comp_id": "C2026C00100",
-                        "live_effective_date": "2026-01-01",
-                    },
+                    }
                 },
             }
         )
@@ -70,8 +63,26 @@ def test_build_site_embeds_verification_and_recomputes_against_current_compilati
         "live_effective_date": "2026-07-01",
     }
 
+    # not in the exception list, but the run completed -> current as of the run date
     itaa = json.loads((out_dir / "income-tax-assessment-act-1997.json").read_text())
     assert itaa["verification"] == {"status": "current", "checked_at": "2026-08-28"}
+
+
+def test_build_site_omits_verification_when_run_never_completed(tmp_path):
+    out_dir = tmp_path / "data"
+    verification = tmp_path / "verification.json"
+    verification.write_text(json.dumps({"generated_at": None, "acts": {}}))
+
+    build_site(
+        corpus_index=FIXTURES / "mini-corpus-index.json",
+        xml_dir=FIXTURES / "xml",
+        graph_path=None,
+        out_dir=out_dir,
+        verification_path=verification,
+    )
+
+    privacy = json.loads((out_dir / "privacy-act-1988.json").read_text())
+    assert "verification" not in privacy
 
 
 def test_build_site_omits_verification_when_no_file_given(tmp_path):
