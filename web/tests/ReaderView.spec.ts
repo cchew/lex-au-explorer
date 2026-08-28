@@ -2,6 +2,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import { createRouter, createMemoryHistory } from "vue-router";
 import ReaderView from "../src/views/ReaderView.vue";
+import { track } from "../src/lib/analytics";
+
+vi.mock("../src/lib/analytics", () => ({ track: vi.fn() }));
 
 const MOCK_BUNDLE = {
   frbr_uri: "/akn/au/act/1988/119", title: "Privacy Act 1988", title_id: "C1",
@@ -106,6 +109,7 @@ function malformedJsonResponse() {
 }
 
 beforeEach(() => {
+  vi.mocked(track).mockClear();
   vi.stubGlobal("fetch", vi.fn(async (url: string) => {
     if (url.includes("index.json")) {
       return jsonResponse(MOCK_INDEX);
@@ -348,5 +352,72 @@ describe("ReaderView", () => {
     expect(wrapper.find(".load-error").exists()).toBe(true);
     expect(wrapper.text()).not.toContain("HTTP 404");
     expect(wrapper.text()).toContain("Invalid response");
+  });
+
+  it("records act_opened with the entry method when opened from a shortcut", async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: "/reader", component: ReaderView }],
+    });
+    router.push("/reader");
+    await router.isReady();
+
+    const wrapper = mount(ReaderView, { global: { plugins: [router] } });
+    await new Promise((r) => setTimeout(r, 10));
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+    await wrapper.find(".shortcut-btn").trigger("click");
+    await new Promise((r) => setTimeout(r, 10));
+    await wrapper.vm.$nextTick();
+
+    expect(track).toHaveBeenCalledWith("act_opened", {
+      slug: "privacy-act-1988",
+      source: "shortcut",
+    });
+  });
+
+  it("records act_opened with source 'direct' for a deep link", async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: "/reader", component: ReaderView },
+        { path: "/reader/:slug", component: ReaderView },
+      ],
+    });
+    router.push("/reader/privacy-act-1988");
+    await router.isReady();
+
+    mount(ReaderView, { global: { plugins: [router] } });
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(track).toHaveBeenCalledWith("act_opened", {
+      slug: "privacy-act-1988",
+      source: "direct",
+    });
+  });
+
+  it("records toc_navigate with a coarse position, not a raw eid", async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: "/reader", component: ReaderView }],
+    });
+    router.push("/reader");
+    await router.isReady();
+
+    const wrapper = mount(ReaderView, { global: { plugins: [router] } });
+    await new Promise((r) => setTimeout(r, 10));
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+    await wrapper.find(".shortcut-btn").trigger("click");
+    await new Promise((r) => setTimeout(r, 10));
+    await wrapper.vm.$nextTick();
+    vi.mocked(track).mockClear();
+
+    await wrapper.find(".toc-leaf").trigger("click");
+
+    const call = vi.mocked(track).mock.calls.find((c) => c[0] === "toc_navigate");
+    expect(call).toBeDefined();
+    expect(call![1]).toEqual({ slug: "privacy-act-1988", position: expect.any(String) });
+    expect(call![1]).not.toHaveProperty("eid");
   });
 });

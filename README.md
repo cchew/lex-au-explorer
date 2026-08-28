@@ -9,6 +9,7 @@ Current features:
 
 ## Versions
 
+- v0.1.4: Umami analytics live (per-environment Website ID via Vite). Adds `search_no_results` and an entry-method (`typed`/`shortcut`/`direct`) on `act_opened`; `definition_hover` now carries the Act slug; `toc_navigate` reports a coarse position bucket instead of a raw eid.
 - v0.1.3: `verification.json` records only exceptions (stale/repealed) plus a completed-run date, instead of one entry per Act.
 - v0.1.2: source-fidelity panel now carries a build-time currency check against legislation.gov.au, refreshed out-of-band by `lex-au-explorer-verify` (no network access in the build).
 - v0.1.1: fixes section rendering to include subsection/paragraph/authorial-note body text, not just a section's own top-level content (52% of Privacy Act 1988 sections were rendering under 30 chars of body text). Reader now shows a whole TOC group's sections at once with scroll-to-anchor navigation, plus an Act key-info header (title, No., year). Rebranded shell, Umami analytics wired (dormant pending a Website ID).

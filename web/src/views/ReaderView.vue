@@ -42,7 +42,9 @@ async function fetchJson<T>(url: string): Promise<T> {
   }
 }
 
-async function selectAct(slug: string) {
+type OpenSource = "typed" | "shortcut" | "direct";
+
+async function selectAct(slug: string, source: OpenSource = "direct") {
   error.value = null;
   bundle.value = null;
   activeSection.value = null;
@@ -52,7 +54,7 @@ async function selectAct(slug: string) {
   try {
     const data = await fetchJson<ActBundle>(`/data/${slug}.json`);
     bundle.value = data;
-    track("act_opened", { slug });
+    track("act_opened", { slug, source });
     const firstTopLevelEid = data.toc[0]?.eid ?? null;
     if (data.split_by_part) {
       if (firstTopLevelEid) await loadPart(slug, firstTopLevelEid);
@@ -98,6 +100,19 @@ function flattenLeafEids(node: TocNode): string[] {
   return eids;
 }
 
+// Coarse "how far into the Act" bucket for analytics -- a raw eid is
+// high-cardinality noise in Umami's event-data view; what's actually
+// informative is whether people jump around near the front or read deep.
+function sectionPosition(eid: string): "first" | "early" | "mid" | "late" {
+  const all = (bundle.value?.toc ?? []).flatMap(flattenLeafEids);
+  const i = all.indexOf(eid);
+  if (i <= 0 || all.length < 2) return "first";
+  const frac = i / (all.length - 1);
+  if (frac < 0.34) return "early";
+  if (frac < 0.67) return "mid";
+  return "late";
+}
+
 // All sections belonging to the currently active top-level TOC group, in
 // document order -- the content pane shows a whole group at once (e.g.
 // every section under "Preliminary") rather than one section in
@@ -126,7 +141,7 @@ async function scrollToSection(eid: string) {
 
 async function selectSection(eid: string) {
   activeSection.value = eid;
-  track("toc_navigate", { slug: currentSlug.value, eid });
+  track("toc_navigate", { slug: currentSlug.value, position: sectionPosition(eid) });
   const targetGroup = ownerPartEid(eid);
   if (!bundle.value?.split_by_part) {
     activeTopLevelEid.value = targetGroup;
@@ -162,7 +177,7 @@ onMounted(() => {
         <ActHeader :bundle="bundle" />
         <SourceTrustPanel :bundle="bundle" />
         <div v-for="s in visibleSections" :key="s.eid" :id="s.eid" class="section-anchor">
-          <SectionContent :section="s.section" :definitions="bundle.definitions" />
+          <SectionContent :section="s.section" :definitions="bundle.definitions" :slug="currentSlug ?? undefined" />
         </div>
       </div>
     </div>

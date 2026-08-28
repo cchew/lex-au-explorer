@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import type { IndexEntry } from "../types";
+import { track } from "../lib/analytics";
 
 const SHORTCUTS = ["privacy-act-1988", "fair-work-act-2009", "corporations-act-2001"];
+const NO_RESULT_DEBOUNCE_MS = 600;
 
-const emit = defineEmits<{ select: [slug: string] }>();
+const emit = defineEmits<{ select: [slug: string, source: "typed" | "shortcut"] }>();
 
 const index = ref<IndexEntry[]>([]);
 const query = ref("");
@@ -22,8 +24,22 @@ const matches = computed(() => {
   return index.value.filter((e) => e.title.toLowerCase().includes(q)).slice(0, 20);
 });
 
-function select(slug: string) {
-  emit("select", slug);
+// Fire once per settled query that a user typed and got nothing back for --
+// the clearest signal of what the corpus is missing or what isn't findable.
+let noResultTimer: ReturnType<typeof setTimeout> | undefined;
+let lastReportedMiss = "";
+watch([query, matches], ([q, ms]) => {
+  const trimmed = q.trim().toLowerCase();
+  if (noResultTimer) clearTimeout(noResultTimer);
+  if (trimmed.length < 2 || ms.length > 0 || trimmed === lastReportedMiss) return;
+  noResultTimer = setTimeout(() => {
+    lastReportedMiss = trimmed;
+    track("search_no_results", { query: trimmed.slice(0, 60) });
+  }, NO_RESULT_DEBOUNCE_MS);
+});
+
+function select(slug: string, source: "typed" | "shortcut") {
+  emit("select", slug, source);
   query.value = "";
 }
 </script>
@@ -45,7 +61,7 @@ function select(slug: string) {
         :key="m.slug"
         data-testid="search-option"
         class="result"
-        @click="select(m.slug)"
+        @click="select(m.slug, 'typed')"
       >{{ m.title }}</li>
     </ul>
     <nav v-else class="shortcuts" aria-label="Shortcut Acts">
@@ -54,7 +70,7 @@ function select(slug: string) {
         :key="s.slug"
         type="button"
         class="shortcut-btn"
-        @click="select(s.slug)"
+        @click="select(s.slug, 'shortcut')"
       >{{ s.title }}</button>
     </nav>
   </div>

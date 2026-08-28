@@ -7,6 +7,7 @@ import { track } from "../lib/analytics";
 const props = defineProps<{
   section: { heading: string; html: string };
   definitions: Record<string, DefinitionEntry>;
+  slug?: string;
 }>();
 
 const activeTerm = ref<string | null>(null);
@@ -22,7 +23,7 @@ function onMouseEnter(event: MouseEvent) {
   // "key interaction."
   showTimer = setTimeout(() => {
     activeTerm.value = term;
-    track("definition_hover", { term });
+    track("definition_hover", props.slug ? { term, slug: props.slug } : { term });
   }, 200);
 }
 
