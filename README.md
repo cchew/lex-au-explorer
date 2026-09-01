@@ -27,6 +27,8 @@ Vite bundling `public/`) deployed as a pre-built directory.
     npm run build               # vue-tsc + vite build; bakes public/data into dist/
     netlify deploy --prod --dir=dist   # deploys the pre-built dist/, no remote build
 
+Reader data is served from `web/public/data` (dev) and `web/dist/data` (prod); there is no `web/data/` - if it exists it is a stale hand-run, delete it.
+
 ## Source-fidelity verification
 
 `web/verification.json` records the Acts whose corpus copy is behind
