@@ -1,0 +1,217 @@
+"""Stage 2 style maps: turn a semantic :class:`~build.ir.Node` and its
+already-rendered children into an HTML string.
+
+:class:`StyleMap` is the structural contract the render walk
+(:func:`build.render.render_section`) depends on. :class:`HtmlStyleMap` is the
+default implementation: one ``_<kind>`` method per entry in
+:data:`build.ir.KINDS`, dispatched by :meth:`HtmlStyleMap.render` via
+``getattr(self, "_" + node.kind, self._raw)``.
+
+Security contract (the rendered string is injected into the reader via Vue's
+``v-html``): every text value and every attribute value is passed through
+:func:`html.escape`. No ``_<kind>`` method emits a ``<script>`` element, an
+``on*`` handler attribute, a ``style`` attribute, or a ``javascript:`` URL.
+Subclasses that override a method inherit this obligation.
+"""
+
+from __future__ import annotations
+
+import html
+import os.path
+from typing import Protocol, runtime_checkable
+
+from build.ir import Node
+
+__all__ = ["StyleMap", "HtmlStyleMap"]
+
+
+@runtime_checkable
+class StyleMap(Protocol):
+    """Render one node given its children rendered to strings.
+
+    ``children`` is the list of child render results in document order, never a
+    pre-joined blob: container kinds (``table``, ``list``, ``row``) need the
+    individual elements to wrap or interleave them.
+    """
+
+    def render(self, node: Node, children: list[str]) -> str: ...
+
+
+def _esc(value: object) -> str:
+    """Escape any value for use in text content or a double-quoted attribute."""
+    return html.escape("" if value is None else str(value), quote=True)
+
+
+class HtmlStyleMap:
+    """Default semantic-HTML style map for the legislation reader."""
+
+    # Per-level provision marker. ``clause`` / ``subclause`` (schedule
+    # provisions) render a bare number to match the gov Schedule render; the
+    # Act-body levels are parenthesised.
+    MARKERS: dict[str, str] = {
+        "subsection": "({num})",
+        "paragraph": "({num})",
+        "subparagraph": "({num})",
+        "clause": "{num}",
+        "subclause": "{num}",
+    }
+
+    # ------------------------------------------------------------------ #
+    # Dispatch
+    # ------------------------------------------------------------------ #
+
+    def render(self, node: Node, children: list[str]) -> str:
+        handler = getattr(self, "_" + node.kind, self._raw)
+        return handler(node, children)
+
+    # ------------------------------------------------------------------ #
+    # Structural containers
+    # ------------------------------------------------------------------ #
+
+    def _section(self, node: Node, children: list[str]) -> str:
+        return "".join(children)
+
+    def _content(self, node: Node, children: list[str]) -> str:
+        return "".join(children)
+
+    def _para(self, node: Node, children: list[str]) -> str:
+        return f"<p>{''.join(children)}</p>"
+
+    def _provision(self, node: Node, children: list[str]) -> str:
+        level = str(node.attrs.get("level", "") or "")
+        eid = str(node.attrs.get("eid", "") or "")
+        num = str(node.attrs.get("num", "") or "")
+        marker = ""
+        if num:
+            marker = self.MARKERS.get(level, "{num}").format(num=num)
+        id_attr = f' id="{_esc(eid)}"' if eid else ""
+        return (
+            f'<div class="akn-{_esc(level)}"{id_attr}>'
+            f'<span class="akn-num">{_esc(marker)}</span>'
+            f'<div class="akn-body">{"".join(children)}</div>'
+            "</div>"
+        )
+
+    # ------------------------------------------------------------------ #
+    # Block text constructs
+    # ------------------------------------------------------------------ #
+
+    def _note(self, node: Node, children: list[str]) -> str:
+        label = str(node.attrs.get("label", "") or "")
+        label_span = (
+            f'<span class="akn-note-label">{_esc(label)}</span>' if label else ""
+        )
+        return f'<div class="akn-notetext">{label_span}{"".join(children)}</div>'
+
+    def _example(self, node: Node, children: list[str]) -> str:
+        return f'<div class="akn-exampletext">{"".join(children)}</div>'
+
+    def _penalty(self, node: Node, children: list[str]) -> str:
+        return f'<div class="akn-penaltytext">{"".join(children)}</div>'
+
+    def _list(self, node: Node, children: list[str]) -> str:
+        return f'<div class="akn-list">{"".join(children)}</div>'
+
+    def _intro(self, node: Node, children: list[str]) -> str:
+        return f'<p class="akn-intro">{"".join(children)}</p>'
+
+    def _item(self, node: Node, children: list[str]) -> str:
+        num = str(node.attrs.get("num", "") or "")
+        marker = (
+            f'<span class="akn-num">({_esc(num)})</span>' if num else ""
+        )
+        return (
+            f'<div class="akn-item">{marker}'
+            f'<div class="akn-body">{"".join(children)}</div></div>'
+        )
+
+    # ------------------------------------------------------------------ #
+    # Tables
+    # ------------------------------------------------------------------ #
+
+    def _table(self, node: Node, children: list[str]) -> str:
+        header_idx: int | None = None
+        for i, child in enumerate(node.children):
+            if child.kind == "row" and child.attrs.get("header"):
+                header_idx = i
+                break
+        thead = ""
+        if header_idx is not None:
+            thead = f"<thead>{children[header_idx]}</thead>"
+        body_rows = [
+            row for i, row in enumerate(children) if i != header_idx
+        ]
+        tbody = f"<tbody>{''.join(body_rows)}</tbody>" if body_rows else ""
+        return f'<table class="akn-table">{thead}{tbody}</table>'
+
+    def _row(self, node: Node, children: list[str]) -> str:
+        return f"<tr>{''.join(children)}</tr>"
+
+    def _cell(self, node: Node, children: list[str]) -> str:
+        tag = "td" if node.attrs.get("td") else "th"
+        span_attrs = ""
+        for attr in ("colspan", "rowspan"):
+            value = node.attrs.get(attr)
+            if value is not None and str(value) != "":
+                span_attrs += f' {attr}="{_esc(value)}"'
+        return f"<{tag}{span_attrs}>{''.join(children)}</{tag}>"
+
+    # ------------------------------------------------------------------ #
+    # Figures
+    # ------------------------------------------------------------------ #
+
+    def _figure(self, node: Node, children: list[str]) -> str:
+        src = str(node.attrs.get("src", "") or "")
+        alt = str(node.attrs.get("alt", "") or "")
+        if node.attrs.get("asset"):
+            basename = os.path.basename(src)
+            return (
+                f'<figure><img src="/data/images/{_esc(basename)}" '
+                f'alt="{_esc(alt)}"></figure>'
+            )
+        return (
+            f'<figure class="akn-figure-missing">[figure: {_esc(alt or src)}]'
+            "</figure>"
+        )
+
+    # ------------------------------------------------------------------ #
+    # Inline constructs
+    # ------------------------------------------------------------------ #
+
+    def _text(self, node: Node, children: list[str]) -> str:
+        return _esc(node.text)
+
+    def _emphasis(self, node: Node, children: list[str]) -> str:
+        tag = "strong" if node.attrs.get("style") == "bold" else "em"
+        return f"<{tag}>{''.join(children)}</{tag}>"
+
+    def _term(self, node: Node, children: list[str]) -> str:
+        term = str(node.attrs.get("term", "") or "")
+        display = str(node.attrs.get("display", "") or "")
+        return f'<span data-term="{_esc(term)}">{_esc(display)}</span>'
+
+    def _ref(self, node: Node, children: list[str]) -> str:
+        text = str(node.attrs.get("text", "") or "")
+        if node.attrs.get("status") == "resolved":
+            eid = str(node.attrs.get("target_eid", "") or "")
+            return (
+                f'<a class="akn-ref" data-eid="{_esc(eid)}" '
+                f'href="#{_esc(eid)}">{_esc(text)}</a>'
+            )
+        return f'<span class="akn-ref akn-ref-unresolved">{_esc(text)}</span>'
+
+    def _date(self, node: Node, children: list[str]) -> str:
+        return f'<span class="akn-date">{"".join(children)}</span>'
+
+    def _quantity(self, node: Node, children: list[str]) -> str:
+        return f'<span class="akn-quantity">{"".join(children)}</span>'
+
+    def _inline_raw(self, node: Node, children: list[str]) -> str:
+        return "".join(children)
+
+    # ------------------------------------------------------------------ #
+    # Total fallback
+    # ------------------------------------------------------------------ #
+
+    def _raw(self, node: Node, children: list[str]) -> str:
+        return "".join(children)
