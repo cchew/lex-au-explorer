@@ -18,8 +18,8 @@ const appVersion = "0.1.1";
       <nav class="top-nav">
         <router-link to="/" class="nav-link">Home</router-link>
         <router-link to="/reader" class="nav-link">Legislation Reader</router-link>
-        <span class="nav-link nav-link-disabled" aria-disabled="true">Clause Kit</span>
-        <span class="nav-link nav-link-disabled" aria-disabled="true">Act Alike</span>
+        <a href="https://clause-kit.netlify.app" target="_blank" rel="noopener" class="nav-link">Clause Kit</a>
+        <a href="https://act-alike.netlify.app" target="_blank" rel="noopener" class="nav-link">Act Alike</a>
       </nav>
     </header>
     <main>
@@ -70,12 +70,6 @@ const appVersion = "0.1.1";
 .nav-link:hover { background: var(--color-surface-hover); color: var(--color-ink); }
 .nav-link.router-link-active { color: var(--color-ink); font-weight: 600; }
 
-.nav-link-disabled {
-  color: var(--color-ink-3);
-  cursor: default;
-  opacity: 0.6;
-}
-.nav-link-disabled:hover { background: none; color: var(--color-ink-3); }
 
 .disclaimer {
   display: flex;

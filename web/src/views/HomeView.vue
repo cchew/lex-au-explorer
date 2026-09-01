@@ -8,14 +8,14 @@
         <h2>Legislation Reader</h2>
         <p>Browse Acts with defined terms highlighted</p>
       </router-link>
-      <div class="card card-disabled" aria-disabled="true">
-        <h2>Clause Kit (coming soon)</h2>
+      <a href="https://clause-kit.netlify.app" target="_blank" rel="noopener" class="card">
+        <h2>Clause Kit</h2>
         <p>LLM-extracted, citation-verified rules-as-code from legislation.</p>
-      </div>
-      <div class="card card-disabled" aria-disabled="true">
-        <h2>Act Alike (coming soon)</h2>
+      </a>
+      <a href="https://act-alike.netlify.app" target="_blank" rel="noopener" class="card">
+        <h2>Act Alike</h2>
         <p>Compare how a legal term is defined differently across different Acts.</p>
-      </div>
+      </a>
     </div>
   </div>
 </template>
@@ -40,6 +40,4 @@
 .card h2 { font-size: 1rem; margin-bottom: var(--s-2); color: var(--color-ink); }
 .card p { font-size: 0.8125rem; color: var(--color-ink-2); }
 
-.card-disabled { cursor: default; opacity: 0.6; }
-.card-disabled:hover { background: var(--color-surface); border-color: var(--color-border); }
 </style>
