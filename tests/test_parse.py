@@ -335,6 +335,68 @@ def test_authorial_note_numbered_label_split_off() -> None:
     assert not _text(n1).startswith("Note 1:")
 
 
+def test_authorial_note_second_content_not_dropped() -> None:
+    node = parse_section(
+        _sec(
+            "<authorialNote><content>"
+            "<p>Note: first line of the note.</p>"
+            "</content><content>"
+            "<p>second line of the note.</p>"
+            "</content></authorialNote>"
+        ),
+        build_ref_index([]),
+    )
+    note = _find(node, lambda n: n.kind == "note")
+    assert note is not None
+    assert note.attrs["label"] == "Note:"
+    contents = [c for c in note.children if c.kind == "content"]
+    assert len(contents) == 2
+    body = _text(note)
+    assert "first line of the note." in body
+    assert "second line of the note." in body
+    assert "Note:" not in body
+
+
+def test_term_node_key_and_display() -> None:
+    node = parse_section(
+        _sec("<content><p><term>Taxable Income</term> means assessable income.</p></content>"),
+        build_ref_index([]),
+    )
+    term = _find(node, lambda n: n.kind == "term")
+    assert term is not None
+    assert term.attrs["term"] == "taxable income"
+    assert term.attrs["display"] == "Taxable Income"
+
+
+def test_term_key_is_stripped() -> None:
+    node = parse_section(
+        _sec("<content><p><term>\n  Financial Year\n  </term> means ...</p></content>"),
+        build_ref_index([]),
+    )
+    term = _find(node, lambda n: n.kind == "term")
+    assert term is not None
+    assert term.attrs["term"] == "financial year"
+
+
+def test_example_and_penalty_hcontainers() -> None:
+    node = parse_section(
+        _sec(
+            "<hcontainer name=\"example\"><num>1</num><content>"
+            "<p>A company that fails to lodge.</p></content></hcontainer>"
+            "<hcontainer name=\"penalty\"><content>"
+            "<p>50 penalty units.</p></content></hcontainer>"
+        ),
+        build_ref_index([]),
+    )
+    example = _find(node, lambda n: n.kind == "example")
+    penalty = _find(node, lambda n: n.kind == "penalty")
+    assert example is not None
+    assert example.attrs.get("num") == "1"
+    assert _text(example).strip() == "A company that fails to lodge."
+    assert penalty is not None
+    assert _text(penalty).strip() == "50 penalty units."
+
+
 def test_unknown_block_becomes_raw_and_keeps_text() -> None:
     node = parse_section(
         _sec("<foversized>kept <b>bold</b> text</foversized>"),

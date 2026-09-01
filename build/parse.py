@@ -179,14 +179,20 @@ def _parse_note(
 ) -> Node:
     node = Node("note")
     _apply_identity(node, el)
-    content_el = el.find(f"{AKN}content")
-    if content_el is None:
-        return node
-    content_node = _parse_content(content_el, section_eid, ref_index)
-    label = _split_note_label(content_node)
-    if label:
-        node.attrs["label"] = label
-    node.children.append(content_node)
+    # Iterate and recurse every child (like the other block handlers) so a
+    # second <content>, a <num>, or any other block child is never dropped.
+    for child in el:
+        if _local_tag(child) in _SKIP_TAGS:
+            continue
+        parsed = _parse_block(child, section_eid, ref_index)
+        if parsed is not None:
+            node.children.append(parsed)
+    for child in node.children:
+        if child.kind == "content":
+            label = _split_note_label(child)
+            if label:
+                node.attrs["label"] = label
+            break
     return node
 
 
@@ -338,7 +344,9 @@ def _parse_inline(
         return node
     if tag == "term":
         display = "".join(el.itertext())
-        return Node("term", {"term": display.lower(), "display": display})
+        # Strip only the lookup key (edge whitespace from pretty-printed source
+        # would otherwise leak into the resolver input); keep display verbatim.
+        return Node("term", {"term": display.strip().lower(), "display": display})
     if tag == "ref":
         return _parse_ref(el, section_eid, ref_index)
     if tag == "date":
