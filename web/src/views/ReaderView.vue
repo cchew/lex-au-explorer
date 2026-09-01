@@ -159,6 +159,20 @@ async function selectSection(eid: string) {
   }
 }
 
+// In-app cross-reference navigation: a click on a resolved ref link
+// (a.akn-ref[data-eid], emitted by build/stylemap.py) is intercepted and
+// routed through selectSection, which loads the owning Part for
+// split-by-part Acts and scrolls to the target provision.
+function onContentClick(e: MouseEvent) {
+  if (!(e.target instanceof HTMLElement)) return;
+  const a = e.target.closest("a.akn-ref[data-eid]");
+  if (!(a instanceof HTMLElement)) return;
+  e.preventDefault();
+  const eid = a.dataset.eid;
+  if (!eid) return;
+  selectSection(eid);
+}
+
 onMounted(() => {
   const slug = route.params.slug;
   if (typeof slug === "string") selectAct(slug);
@@ -173,7 +187,7 @@ onMounted(() => {
       <aside class="toc-sidebar">
         <ActToc :nodes="bundle.toc" :active-eid="activeSection" @select="selectSection" />
       </aside>
-      <div class="content-pane">
+      <div class="content-pane" @click="onContentClick">
         <ActHeader :bundle="bundle" />
         <SourceTrustPanel :bundle="bundle" />
         <div v-for="s in visibleSections" :key="s.eid" :id="s.eid" class="section-anchor">
