@@ -2,10 +2,19 @@ import json
 import shutil
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 
+import lxml.etree as ET
 from typer.testing import CliRunner
 
-from build.cli import app, build_site, _write_split_bundle, _collect_section_eids
+from build.cli import (
+    app,
+    build_site,
+    _collect_section_eids,
+    _nav_eids,
+    _write_split_bundle,
+    _TermResolverAdapter,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -235,6 +244,142 @@ def test_installed_console_script_help_does_not_crash():
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "corpus-dir" in result.stdout
+
+
+_STYLE_MAP_MODULE = '''
+from build.stylemap import HtmlStyleMap
+
+
+class _LoudStyleMap(HtmlStyleMap):
+    def _emphasis(self, node, children):
+        return "<mark>" + "".join(children) + "</mark>"
+
+
+STYLE_MAP = _LoudStyleMap()
+'''
+
+
+def test_style_map_option_loads_module_level_STYLE_MAP(tmp_path):
+    style_map = tmp_path / "loud_map.py"
+    style_map.write_text(_STYLE_MAP_MODULE)
+    out_dir = tmp_path / "data"
+
+    build_site(
+        corpus_index=FIXTURES / "mini-corpus-index.json",
+        xml_dir=FIXTURES / "xml",
+        graph_path=None,
+        out_dir=out_dir,
+        style_map_path=style_map,
+    )
+
+    bundle = json.loads((out_dir / "privacy-act-1988.json").read_text())
+    # sec-5B subsec-2 source has <b><i>Australian link</i></b>.
+    html = bundle["sections"]["part-I__sec-5B"]["html"]
+    assert "<mark>Australian link</mark>" in html
+    assert "<em>" not in html and "<strong>" not in html
+
+
+def test_absent_style_map_uses_default_html_style_map(tmp_path):
+    out_dir = tmp_path / "data"
+    build_site(
+        corpus_index=FIXTURES / "mini-corpus-index.json",
+        xml_dir=FIXTURES / "xml",
+        graph_path=None,
+        out_dir=out_dir,
+    )
+    bundle = json.loads((out_dir / "privacy-act-1988.json").read_text())
+    html = bundle["sections"]["part-I__sec-5B"]["html"]
+    assert "<strong><em>Australian link</em></strong>" in html
+
+
+def test_emit_ir_writes_one_node_dict_json_per_section(tmp_path):
+    out_dir = tmp_path / "data"
+    ir_dir = tmp_path / "ir"
+
+    build_site(
+        corpus_index=FIXTURES / "mini-corpus-index.json",
+        xml_dir=FIXTURES / "xml",
+        graph_path=None,
+        out_dir=out_dir,
+        emit_ir_dir=ir_dir,
+    )
+
+    ir_file = ir_dir / "privacy-act-1988" / "part-I__sec-6.json"
+    assert ir_file.exists()
+    node = json.loads(ir_file.read_text())
+    assert node["kind"] == "section"
+    assert node["attrs"]["eid"] == "part-I__sec-6"
+    assert node["attrs"]["heading"] == "Interpretation"
+    assert isinstance(node["children"], list)
+    # A section with no <section> children is not written under emit-ir for the
+    # empty ITAA stub.
+    assert not (ir_dir / "income-tax-assessment-act-1997").exists()
+
+
+def test_ref_tally_json_shape_per_act_and_total(tmp_path):
+    out_dir = tmp_path / "data"
+    build_site(
+        corpus_index=FIXTURES / "mini-corpus-index.json",
+        xml_dir=FIXTURES / "xml",
+        graph_path=None,
+        out_dir=out_dir,
+    )
+
+    tally = json.loads((out_dir / "ref-tally.json").read_text())
+    assert set(tally["privacy-act-1988"]) == {"resolved", "ambiguous", "unresolved"}
+    assert all(isinstance(v, int) for v in tally["privacy-act-1988"].values())
+
+    # privacy-act-1988 sec-13: #part-I__sec-6 resolves, href="" does not.
+    assert tally["privacy-act-1988"]["resolved"] >= 1
+    assert tally["privacy-act-1988"]["unresolved"] >= 1
+
+    total = tally["_total"]
+    assert set(total) == {"resolved", "ambiguous", "unresolved"}
+    for key in total:
+        assert total[key] == sum(
+            counts[key] for slug, counts in tally.items() if slug != "_total"
+        )
+
+
+def test_nav_eids_collects_structural_levels_and_schedule_clauses():
+    root = ET.fromstring(
+        '<akomaNtoso xmlns="http://docs.oasis-open.org/legaldocml/ns/akn/3.0">'
+        '<act><body>'
+        '<part eId="part-1">'
+        '<section eId="part-1__sec-3">'
+        '<subsection eId="part-1__sec-3__subsec-1"/>'
+        '</section></part>'
+        '<hcontainer name="schedule" eId="schedule-1">'
+        '<hcontainer name="clause" eId="schedule-1__clause-70-20">'
+        '<hcontainer name="subclause" eId="schedule-1__clause-70-20__subclause-1"/>'
+        '</hcontainer></hcontainer>'
+        '</body></act></akomaNtoso>'
+    )
+    eids = set(_nav_eids(root))
+    assert eids == {
+        "part-1",
+        "part-1__sec-3",
+        "part-1__sec-3__subsec-1",
+        "schedule-1__clause-70-20",
+        "schedule-1__clause-70-20__subclause-1",
+    }
+    # name="schedule" hcontainer is structural, not a nav target.
+    assert "schedule-1" not in eids
+
+
+def test_term_resolver_adapter_binds_frbr_uri_and_returns_result():
+    calls = []
+
+    class FakeResolver:
+        def resolve_definition(self, term, act_frbr_uri, section_eid=None):
+            calls.append((term, act_frbr_uri, section_eid))
+            return SimpleNamespace(section_eid="part-1__sec-9")
+
+    adapter = _TermResolverAdapter(FakeResolver(), "/akn/au/act/1997/38")
+    result = adapter.resolve_definition("financial year")
+
+    assert calls == [("financial year", "/akn/au/act/1997/38", None)]
+    assert result.section_eid == "part-1__sec-9"
 
 
 def test_collect_section_eids_recurses_into_divisions():
