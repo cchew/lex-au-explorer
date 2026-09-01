@@ -206,6 +206,42 @@ def test_itaa_hyphenated_section_from_display_text() -> None:
     assert res3.target_eid == "chapter-1__part-1-3__dvs-4__sec-4-15"
 
 
+def test_scrambled_display_text_does_not_link_wrong_provision() -> None:
+    # Spike F.5: the trailing <ref>'s display text was lifted from another
+    # provision. href pre-hyphen digits ("4") disagree with the display text's
+    # pre-hyphen digits ("923"), so the rebuilt eId must NOT be linked even
+    # though it exists in the nav list.
+    nav = [
+        "chapter-1__part-1-3__dvs-4__sec-4-10",
+        "chapter-9__part-9-1__dvs-2__sec-923-1",
+    ]
+    idx = build_ref_index(nav)
+    res = idx.resolve(
+        "#sec-4",
+        from_eid="chapter-1__part-1-3__dvs-4__sec-4-10",
+        display_text="section 923-1",
+    )
+    assert res.status == "unresolved"
+    assert res.target_eid is None
+
+
+def test_hyphenated_rebuild_ambiguous_is_unresolved() -> None:
+    # Rebuilt sec-4-15 suffix-matches two eIds under different prefixes.
+    nav = [
+        "chapter-1__part-1-3__dvs-4__sec-4-15",
+        "chapter-1__part-1-5__dvs-9__sec-4-15",
+        "chapter-1__part-1-3__dvs-4__sec-4-10",
+    ]
+    idx = build_ref_index(nav)
+    res = idx.resolve(
+        "#sec-4",
+        from_eid="chapter-1__part-1-3__dvs-4__sec-4-10",
+        display_text="section 4-15",
+    )
+    assert res.status == "unresolved"
+    assert res.target_eid is None
+
+
 def test_dead_families_fall_through_to_unresolved() -> None:
     nav = [
         "chapter-1__part-1.1__sec-3",

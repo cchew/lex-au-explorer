@@ -20,7 +20,7 @@ from __future__ import annotations
 import collections
 import re
 from dataclasses import dataclass
-from typing import Iterable, Optional, Protocol
+from typing import Iterable, Literal, Optional, Protocol
 
 _SEGMENT_SEP = "__"
 
@@ -50,9 +50,9 @@ class _TermResolver(Protocol):
     def resolve_definition(self, term: str): ...
 
 
-@dataclass
+@dataclass(frozen=True)
 class Resolution:
-    status: str  # "resolved" | "ambiguous" | "unresolved"
+    status: Literal["resolved", "ambiguous", "unresolved"]
     target_eid: Optional[str]
 
 
@@ -79,13 +79,8 @@ class RefIndex:
         # last "__" segment -> eIds ending with it (covers single-segment tails:
         # bare #sec-<n>, #part-<n>, #dvs-<n>).
         self._by_last: dict[str, list[str]] = collections.defaultdict(list)
-        # any "__" segment -> eIds containing it (Part/Division scoping).
-        self._by_segment: dict[str, list[str]] = collections.defaultdict(list)
         for eid in self._eids:
-            segments = eid.split(_SEGMENT_SEP)
-            self._by_last[segments[-1]].append(eid)
-            for seg in segments:
-                self._by_segment[seg].append(eid)
+            self._by_last[eid.split(_SEGMENT_SEP)[-1]].append(eid)
 
     # -- public API ---------------------------------------------------------
 
@@ -162,8 +157,16 @@ class RefIndex:
         # (never fall back to the lossy bare number).
         hyphenated = _HYPHENATED_PROVISION.search(text)
         if hyphenated:
-            rebuilt = "sec-" + hyphenated.group(1)
-            hits = self._suffix_match(rebuilt)
+            full_number = hyphenated.group(1)
+            # Guard against the cross-Act scramble (spike F.5): a legitimate
+            # truncation keeps the pre-hyphen digits ("section 4-15" -> "#sec-4"),
+            # so the href number and the display number must agree there. A
+            # mismatch means the display text was lifted from another provision;
+            # do not link it.
+            href_number = target[len("sec-") :]
+            if full_number.split("-", 1)[0] != href_number:
+                return _UNRESOLVED
+            hits = self._suffix_match("sec-" + full_number)
             return _resolved(hits[0]) if len(hits) == 1 else _UNRESOLVED
 
         hits = self._suffix_match(target)
