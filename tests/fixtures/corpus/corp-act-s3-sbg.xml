@@ -1,0 +1,91 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<akomaNtoso xmlns="http://docs.oasis-open.org/legaldocml/ns/akn/3.0">
+  <act name="act">
+    <meta>
+      <!-- Trimmed real-corpus fixture (lex-au-explorer Task 1). Source: lex-au/repo/corpus/xml/corporations-act-2001.xml. Kept: full <identification> + a <references> block filtered to TLC entries cited in this subtree. Dropped from <meta>: <lifecycle>, <temporalData>. Body trimmed to the single target subtree. -->
+      <identification source="#lex-au">
+        <FRBRWork>
+          <FRBRthis value="/akn/au/act/2001/50/!main"/>
+          <FRBRuri value="/akn/au/act/2001/50"/>
+          <FRBRdate date="2001-01-01" name="Generation"/>
+          <FRBRauthor href="#parliament"/>
+          <FRBRcountry value="au"/>
+          <FRBRsubtype value="act"/>
+          <FRBRnumber value="50"/>
+          <FRBRname value="corporations-act-2001"/>
+          <FRBRprescriptive value="true"/>
+          <FRBRauthoritative value="true"/>
+        </FRBRWork>
+        <FRBRExpression>
+          <FRBRthis value="/akn/au/act/2001/50/eng@2026-07-01/!main"/>
+          <FRBRuri value="/akn/au/act/2001/50/eng@2026-07-01"/>
+          <FRBRdate date="2026-07-01" name="Generation"/>
+          <FRBRauthor href="#parliament"/>
+          <FRBRlanguage language="eng"/>
+        </FRBRExpression>
+        <FRBRManifestation>
+          <FRBRthis value="/akn/au/act/2001/50/eng@2026-07-01/!main.akn"/>
+          <FRBRuri value="/akn/au/act/2001/50/eng@2026-07-01/!main.akn"/>
+          <FRBRdate date="2026-08-17" name="Generation"/>
+          <FRBRauthor href="#lex-au"/>
+        </FRBRManifestation>
+      </identification>
+    </meta>
+    <body>
+      <section eId="chapter-1__part-1.5__sec-3">
+            <num>3</num>
+            <heading>Setting up a new company</heading>
+            <content>
+              <p>The operators of small businesses can either buy “shelf” companies or set up new companies themselves.</p>
+              <p>3.1 “Shelf” companies</p>
+              <p>The operator of a small business may find it more convenient to buy a “shelf” company (a company that has already been registered but has not traded) from businesses which set up companies for this purpose or from some legal or accounting firms.</p>
+              <p>3.2 Setting up a company</p>
+              <p>To set up a new company themselves, the operator must apply to ASIC for registration of the company.</p>
+              <p>A proprietary company limited by shares must have at least 1 shareholder.</p>
+              <p>To obtain registration, a person must lodge a properly completed application form with ASIC. The form must set out certain information including details of every person who has consented to be a shareholder, director or company secretary of the company.</p>
+              <p>The company comes into existence when ASIC registers it.</p>
+              <p>[sections 117—119, 135—136, 140]</p>
+              <p>3.3 ACN and name</p>
+              <p>When a company is registered, ASIC allocates to it a unique 9 digit number called the Australian Company Number (ACN). (For use of the ACN see 4.1).</p>
+              <p>In practice, a new company must have a name that is different from the name of a company that is already registered. A proprietary company limited by shares must have the words “Proprietary Limited” as part of its name. Those words can be abbreviated to “Pty Ltd”.</p>
+              <p>A proprietary company may adopt its ACN as its name. If it does so, its name must also contain the words “Australian Company Number” (which can be abbreviated to “ACN”). For example, the company’s name might be “ACN 123 456 789 Pty Ltd”.</p>
+              <p>[sections 119, 147—161]</p>
+              <p>3.4 Contracts entered into before the company is registered</p>
+              <p>A company can ratify a contract entered into by someone on its behalf or for its benefit before it was registered. If the company does not ratify the contract, the person who entered into the contract may be personally liable.</p>
+              <p>[sections 131—133]</p>
+              <p>3.5 First shareholders, directors and company secretary</p>
+              <p>A person listed with their consent as a shareholder, director or company secretary in the application for registration of the company becomes a shareholder, director or company secretary of the company on its registration.</p>
+              <p>The same person may be both a director of the company and the company secretary.</p>
+              <p>See 5.1 and 5.2 for directors and 5.4 for company secretaries. See 6.1 for shareholders.</p>
+              <p>[<ref href="#sec-120">section 120</ref>]</p>
+              <p>3.6 Issuing shares</p>
+              <p>It is a replaceable rule (see 1.6) that, before issuing new shares, a company must first offer them to the existing shareholders in the proportions that the shareholders already hold. A company may issue shares at a price it determines.</p>
+              <p>[sections 254B, 254D]</p>
+              <p>3.7 Registered office</p>
+              <p>A company must have a registered office in Australia and must inform ASIC of the location of the office. A post office box cannot be the registered office of a company. The purpose of the registered office is to have a place where all communications and notices to the company may be sent.</p>
+              <p>If the company does not occupy the premises where its registered office is located, the occupier of the premises must agree in writing to having the company’s registered office located there.</p>
+              <p>A proprietary company is not required to open its registered office to the public but this does not affect its obligation to make documents available for inspection.</p>
+              <p>The company must notify ASIC of any change of address of its registered office.</p>
+              <p>[sections 100, 142, 143, 173, 1300]</p>
+              <p>3.8 Principal place of business</p>
+              <p>If a company has a principal place of business that is different from its registered office, it must notify ASIC of the address of its principal place of business and of any changes to that address.</p>
+              <p>[sections 117, 146]</p>
+              <p>3.9 Registers kept by the company</p>
+              <p>A company must keep registers, including a register of shareholders. A company must keep its registers at:</p>
+              <p>•	the company’s registered office; or</p>
+              <p>•	the company’s principal place of business; or</p>
+              <p>•	a place (whether on premises of the company or of someone else) where the work in maintaining the register is done; or</p>
+              <p>•	another place approved by ASIC.</p>
+              <p>A register may be kept either in a bound or looseleaf book or on computer.</p>
+              <p>If a register is kept on computer, its contents must be capable of being printed out in hard copy.</p>
+              <p>[sections 172, 1300, 1301, 1306]</p>
+              <p>3.10 Register of shareholders</p>
+              <p>A company must keep in its register of shareholders such information as:</p>
+              <p>•	the names and addresses of its shareholders; and</p>
+              <p>•	details of shares held by individual shareholders.</p>
+              <p>[sections 168—169]</p>
+            </content>
+          </section>
+    </body>
+  </act>
+</akomaNtoso>

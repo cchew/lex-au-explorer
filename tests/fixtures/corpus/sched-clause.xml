@@ -1,0 +1,100 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<akomaNtoso xmlns="http://docs.oasis-open.org/legaldocml/ns/akn/3.0">
+  <act name="act">
+    <meta>
+      <!-- Trimmed real-corpus fixture (lex-au-explorer Task 1). Source: lex-au/repo/corpus/xml/corporations-act-2001.xml. Kept: full <identification> + a <references> block filtered to TLC entries cited in this subtree. Dropped from <meta>: <lifecycle>, <temporalData>. Body trimmed to the single target subtree. -->
+      <identification source="#lex-au">
+        <FRBRWork>
+          <FRBRthis value="/akn/au/act/2001/50/!main"/>
+          <FRBRuri value="/akn/au/act/2001/50"/>
+          <FRBRdate date="2001-01-01" name="Generation"/>
+          <FRBRauthor href="#parliament"/>
+          <FRBRcountry value="au"/>
+          <FRBRsubtype value="act"/>
+          <FRBRnumber value="50"/>
+          <FRBRname value="corporations-act-2001"/>
+          <FRBRprescriptive value="true"/>
+          <FRBRauthoritative value="true"/>
+        </FRBRWork>
+        <FRBRExpression>
+          <FRBRthis value="/akn/au/act/2001/50/eng@2026-07-01/!main"/>
+          <FRBRuri value="/akn/au/act/2001/50/eng@2026-07-01"/>
+          <FRBRdate date="2026-07-01" name="Generation"/>
+          <FRBRauthor href="#parliament"/>
+          <FRBRlanguage language="eng"/>
+        </FRBRExpression>
+        <FRBRManifestation>
+          <FRBRthis value="/akn/au/act/2001/50/eng@2026-07-01/!main.akn"/>
+          <FRBRuri value="/akn/au/act/2001/50/eng@2026-07-01/!main.akn"/>
+          <FRBRdate date="2026-08-17" name="Generation"/>
+          <FRBRauthor href="#lex-au"/>
+        </FRBRManifestation>
+      </identification>
+    </meta>
+    <attachments>
+      <attachment>
+        <hcontainer name="schedule" eId="schedule-1">
+          <heading>Insolvency Practice Schedule (Corporations)</heading>
+          <content>
+            <p>Note:	See <ref href="#sec-600K">section 600K</ref>.</p>
+          </content>
+          <hcontainer name="clause" eId="schedule-1__clause-70-20">
+            <num>70-20</num>
+            <heading>Audit of administration books—on order of the Court</heading>
+            <hcontainer name="subclause" eId="schedule-1__clause-70-20__subclause-1">
+              <num>1</num>
+              <content>
+                <p>The Court may order that an audit of the books referred to in <ref href="#sec-70">section 70</ref>-5 (annual administration return), 70-6 (end of administration return) or 70-10 (administration books) be conducted by a registered company auditor.</p>
+              </content>
+            </hcontainer>
+            <hcontainer name="subclause" eId="schedule-1__clause-70-20__subclause-2">
+              <num>2</num>
+              <content>
+                <p>The order may be made on application of:</p>
+              </content>
+            </hcontainer>
+            <paragraph eId="schedule-1__clause-70-20__para-a">
+              <num>a</num>
+              <content>
+                <p>any person with a financial interest in the external administration of the company; or</p>
+              </content>
+            </paragraph>
+            <paragraph eId="schedule-1__clause-70-20__para-b">
+              <num>b</num>
+              <content>
+                <p>an officer of the company.</p>
+              </content>
+            </paragraph>
+            <hcontainer name="subclause" eId="schedule-1__clause-70-20__subclause-3">
+              <num>3</num>
+              <content>
+                <p>Paragraph (2)(b) has effect despite <ref href="#sec-198G">section 198G</ref>.</p>
+              </content>
+            </hcontainer>
+            <content>
+              <p>Note:	Section 198G deals with powers of officers etc. while a company under external administration.</p>
+            </content>
+            <hcontainer name="subclause" eId="schedule-1__clause-70-20__subclause-4">
+              <num>4</num>
+              <content>
+                <p>The Court may make such orders in relation to the audit as it thinks fit, including:</p>
+              </content>
+            </hcontainer>
+            <paragraph eId="schedule-1__clause-70-20__para-a">
+              <num>a</num>
+              <content>
+                <p>the preparation and provision of a report on the audit; and</p>
+              </content>
+            </paragraph>
+            <paragraph eId="schedule-1__clause-70-20__para-b">
+              <num>b</num>
+              <content>
+                <p>orders as to the costs of the audit.</p>
+              </content>
+            </paragraph>
+          </hcontainer>
+        </hcontainer>
+      </attachment>
+    </attachments>
+  </act>
+</akomaNtoso>

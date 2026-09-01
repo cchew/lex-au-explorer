@@ -1,0 +1,118 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<akomaNtoso xmlns="http://docs.oasis-open.org/legaldocml/ns/akn/3.0">
+  <act name="act">
+    <meta>
+      <!-- Trimmed real-corpus fixture (lex-au-explorer Task 1). Source: lex-au/repo/corpus/xml/income-tax-assessment-act-1997.xml. Kept: full <identification> + a <references> block filtered to TLC entries cited in this subtree. Dropped from <meta>: <lifecycle>, <temporalData>. Body trimmed to the single target subtree. -->
+      <identification source="#lex-au">
+        <FRBRWork>
+          <FRBRthis value="/akn/au/act/1997/38/!main"/>
+          <FRBRuri value="/akn/au/act/1997/38"/>
+          <FRBRdate date="1997-01-01" name="Generation"/>
+          <FRBRauthor href="#parliament"/>
+          <FRBRcountry value="au"/>
+          <FRBRsubtype value="act"/>
+          <FRBRnumber value="38"/>
+          <FRBRname value="income-tax-assessment-act-1997"/>
+          <FRBRprescriptive value="true"/>
+          <FRBRauthoritative value="true"/>
+        </FRBRWork>
+        <FRBRExpression>
+          <FRBRthis value="/akn/au/act/1997/38/eng@2026-07-01/!main"/>
+          <FRBRuri value="/akn/au/act/1997/38/eng@2026-07-01"/>
+          <FRBRdate date="2026-07-01" name="Generation"/>
+          <FRBRauthor href="#parliament"/>
+          <FRBRlanguage language="eng"/>
+        </FRBRExpression>
+        <FRBRManifestation>
+          <FRBRthis value="/akn/au/act/1997/38/eng@2026-07-01/!main.akn"/>
+          <FRBRuri value="/akn/au/act/1997/38/eng@2026-07-01/!main.akn"/>
+          <FRBRdate date="2026-08-17" name="Generation"/>
+          <FRBRauthor href="#lex-au"/>
+        </FRBRManifestation>
+      </identification>
+    </meta>
+    <body>
+      <section eId="chapter-1__part-1-3__dvs-4__sec-4-15">
+              <num>4-15</num>
+              <heading>How to work out your taxable income</heading>
+              <subsection eId="chapter-1__part-1-3__dvs-4__sec-4-15__subsec-1">
+                <num>1</num>
+                <content>
+                  <p>	(1)	Work out your <b><i>taxable income</i></b> for the income year like this:</p>
+                </content>
+                <figure>
+                  <img src="corpus/images/income-tax-assessment-act-1997-fig-3.png" alt=""/>
+                </figure>
+                <content>
+                  <p>Method statement</p>
+                  <p>Step 1.	Add up all your assessable income for the income year.</p>
+                  <p>To find out about your assessable income, see <ref href="#dvs-6">Division 6</ref>.</p>
+                  <p>Step 2.	Add up your deductions for the income year.</p>
+                  <p>To find out what you can deduct, see <ref href="#dvs-8">Division 8</ref>.</p>
+                  <p>Step 3.	Subtract your deductions from your assessable income (unless they exceed it). The result is your taxable income. (If the deductions equal or exceed the assessable income, you don’t have a taxable income.)</p>
+                </content>
+                <authorialNote placement="end" eId="note-14" marker="14">
+                  <content>
+                    <p>Note:	If the deductions exceed the assessable income, you may have a tax loss which you may be able to utilise in that or a later income year: see <ref href="#dvs-36">Division 36</ref>.</p>
+                  </content>
+                </authorialNote>
+              </subsection>
+              <subsection eId="chapter-1__part-1-3__dvs-4__sec-4-15__subsec-2">
+                <num>2</num>
+                <content>
+                  <p>There are cases where taxable income is worked out in a special way:</p>
+                </content>
+                <table>
+                  <tr>
+                    <th>Item</th>
+                    <th>For this case ...</th>
+                    <th>See:</th>
+                  </tr>
+                  <tr>
+                    <td>1.</td>
+                    <td>A company does not maintain continuity of ownership and control during the income year and does not satisfy the business continuity test</td>
+                    <td>Subdivision 165-B</td>
+                  </tr>
+                  <tr>
+                    <td>1B.</td>
+                    <td>An entity is a *member of a *consolidated group at any time in the income year</td>
+                    <td>Part 3-90</td>
+                  </tr>
+                  <tr>
+                    <td>2.</td>
+                    <td>A company becomes a PDF (pooled development fund) during the income year, and the PDF component for the income year is a nil amount</td>
+                    <td>section 124ZTA of the Income Tax Assessment Act 1936</td>
+                  </tr>
+                  <tr>
+                    <td>3.</td>
+                    <td>A shipowner or charterer:
+	has its principal place of business outside Australia; and
+	carries passengers, freight or mail shipped in Australia</td>
+                    <td>section 129 of the Income Tax Assessment Act 1936</td>
+                  </tr>
+                  <tr>
+                    <td>4.</td>
+                    <td>An insurer who is a foreign resident enters into insurance contracts connected with Australia</td>
+                    <td>sections 142 and 143 of the Income Tax Assessment Act 1936</td>
+                  </tr>
+                  <tr>
+                    <td>5.</td>
+                    <td>The Commissioner makes a default or special assessment of taxable income</td>
+                    <td>sections 167 and 168 of the Income Tax Assessment Act 1936</td>
+                  </tr>
+                  <tr>
+                    <td>6.</td>
+                    <td>The Commissioner makes a determination of the amount of taxable income to prevent double taxation in certain treaty cases</td>
+                    <td>section 24 of the International Tax Agreements Act 1953</td>
+                  </tr>
+                </table>
+                <authorialNote placement="end" eId="note-15" marker="15">
+                  <content>
+                    <p>Note:	A life insurance company can have a taxable income of the complying superannuation class and/or a taxable income of the ordinary class for the purposes of working out its income tax for an income year: see Subdivision 320-D.</p>
+                  </content>
+                </authorialNote>
+              </subsection>
+            </section>
+    </body>
+  </act>
+</akomaNtoso>

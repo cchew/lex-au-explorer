@@ -1,0 +1,131 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<akomaNtoso xmlns="http://docs.oasis-open.org/legaldocml/ns/akn/3.0">
+  <act name="act">
+    <meta>
+      <!-- Trimmed real-corpus fixture (lex-au-explorer Task 1). Source: lex-au/repo/corpus/xml/income-tax-assessment-act-1997.xml. Kept: full <identification> + a <references> block filtered to TLC entries cited in this subtree. Dropped from <meta>: <lifecycle>, <temporalData>. Body trimmed to the single target subtree. -->
+      <identification source="#lex-au">
+        <FRBRWork>
+          <FRBRthis value="/akn/au/act/1997/38/!main"/>
+          <FRBRuri value="/akn/au/act/1997/38"/>
+          <FRBRdate date="1997-01-01" name="Generation"/>
+          <FRBRauthor href="#parliament"/>
+          <FRBRcountry value="au"/>
+          <FRBRsubtype value="act"/>
+          <FRBRnumber value="38"/>
+          <FRBRname value="income-tax-assessment-act-1997"/>
+          <FRBRprescriptive value="true"/>
+          <FRBRauthoritative value="true"/>
+        </FRBRWork>
+        <FRBRExpression>
+          <FRBRthis value="/akn/au/act/1997/38/eng@2026-07-01/!main"/>
+          <FRBRuri value="/akn/au/act/1997/38/eng@2026-07-01"/>
+          <FRBRdate date="2026-07-01" name="Generation"/>
+          <FRBRauthor href="#parliament"/>
+          <FRBRlanguage language="eng"/>
+        </FRBRExpression>
+        <FRBRManifestation>
+          <FRBRthis value="/akn/au/act/1997/38/eng@2026-07-01/!main.akn"/>
+          <FRBRuri value="/akn/au/act/1997/38/eng@2026-07-01/!main.akn"/>
+          <FRBRdate date="2026-08-17" name="Generation"/>
+          <FRBRauthor href="#lex-au"/>
+        </FRBRManifestation>
+      </identification>
+      <references source="#lex-au">
+        <TLCTerm eId="term-financial-year" href="/ontology/term/au/term-financial-year" showAs="financial year"/>
+      </references>
+    </meta>
+    <body>
+      <section eId="chapter-1__part-1-3__dvs-4__sec-4-10">
+              <num>4-10</num>
+              <heading>How to work out how much income tax you must pay</heading>
+              <subsection eId="chapter-1__part-1-3__dvs-4__sec-4-10__subsec-1">
+                <num>1</num>
+                <content>
+                  <p>You must pay income tax for each <ref href="#term-financial-year">financial year</ref>.</p>
+                </content>
+              </subsection>
+              <subsection eId="chapter-1__part-1-3__dvs-4__sec-4-10__subsec-2">
+                <num>2</num>
+                <content>
+                  <p>	(2)	Your income tax is worked out by reference to your taxable income for the <b><i>income year</i></b>. The income year is the same as the *financial year, except in these cases:</p>
+                </content>
+                <paragraph eId="chapter-1__part-1-3__dvs-4__sec-4-10__subsec-2__para-a">
+                  <num>a</num>
+                  <content>
+                    <p>	(a)	for a company, the income year is the <i>previous</i> financial year;</p>
+                  </content>
+                </paragraph>
+                <paragraph eId="chapter-1__part-1-3__dvs-4__sec-4-10__subsec-2__para-b">
+                  <num>b</num>
+                  <content>
+                    <p>if you have an accounting period that is not the same as the financial year, each such accounting period or, for a company, each previous accounting period is an income year.</p>
+                  </content>
+                  <authorialNote placement="end" eId="note-10" marker="10">
+                    <content>
+                      <p>Note 1:	The Commissioner can allow you to adopt an accounting period ending on a day other than 30 June. See <i>Income Tax Assessment Act 1936</i>.<ref href="#sec-18">section 18</ref> of the </p>
+                    </content>
+                  </authorialNote>
+                  <authorialNote placement="end" eId="note-11" marker="11">
+                    <content>
+                      <p>Note 2:	An accounting period ends, and a new accounting period starts, when a partnership becomes, or ceases to be, a VCLP, an ESVCLP, an AFOF or a VCMP. See <i>Income Tax Assessment Act 1936</i>.<ref href="#sec-18A">section 18A</ref> of the </p>
+                    </content>
+                  </authorialNote>
+                </paragraph>
+              </subsection>
+              <subsection eId="chapter-1__part-1-3__dvs-4__sec-4-10__subsec-3">
+                <num>3</num>
+                <content>
+                  <p>Work out your income tax for the <ref href="#term-financial-year">financial year</ref> as follows:</p>
+                </content>
+                <figure>
+                  <img src="corpus/images/income-tax-assessment-act-1997-fig-2.png" alt=""/>
+                </figure>
+                <content>
+                  <p>Method statement</p>
+                  <p>Step 1.	Work out your taxable income for the income year.</p>
+                  <p>To do this, see <ref href="#sec-4">section 4</ref>-15.</p>
+                  <p>Step 2.	Work out your basic income tax liability on your taxable income using:</p>
+                </content>
+                <paragraph eId="chapter-1__part-1-3__dvs-4__sec-4-10__subsec-3__para-a">
+                  <num>a</num>
+                  <content>
+                    <p>the income tax rate or rates that apply to you for the income year; and</p>
+                  </content>
+                </paragraph>
+                <paragraph eId="chapter-1__part-1-3__dvs-4__sec-4-10__subsec-3__para-b">
+                  <num>b</num>
+                  <content>
+                    <p>any special provisions that apply to working out that liability.</p>
+                  </content>
+                  <content>
+                    <p>See the<i> Income Tax Rates Act 1986 </i>and section 4-25.</p>
+                    <p>Step 3.	Work out your tax offsets for the income year. A <b><i>tax offset</i></b> reduces the amount of income tax you have to pay.</p>
+                    <p>For the list of tax offsets, see <ref href="#sec-13">section 13</ref>-1.</p>
+                    <p>Step 4.	Subtract your *tax offsets from your basic income tax liability. The result is how much income tax you owe for the <ref href="#term-financial-year">financial year</ref>.</p>
+                    <p>Income tax worked out on another basis</p>
+                  </content>
+                  <authorialNote placement="end" eId="note-12" marker="12">
+                    <content>
+                      <p>Note 1:	<ref href="#dvs-63">Division 63</ref> explains what happens if your tax offsets exceed your basic income tax liability. How the excess is treated depends on the type of tax offset.</p>
+                    </content>
+                  </authorialNote>
+                  <authorialNote placement="end" eId="note-13" marker="13">
+                    <content>
+                      <p>Note 2:	Section 4-11 of the <i>Income Tax (Transitional Provisions) Act 1997</i> (which is about the temporary budget repair levy) may increase the amount of income tax worked out under this section.</p>
+                    </content>
+                  </authorialNote>
+                </paragraph>
+              </subsection>
+              <subsection eId="chapter-1__part-1-3__dvs-4__sec-4-10__subsec-4">
+                <num>4</num>
+                <content>
+                  <p>For some entities, some or all of their income tax for the <ref href="#term-financial-year">financial year</ref> is worked out by reference to something other than taxable income for the income year.</p>
+                </content>
+                <content>
+                  <p>See <ref href="#sec-9">section 9</ref>-5.</p>
+                </content>
+              </subsection>
+            </section>
+    </body>
+  </act>
+</akomaNtoso>
