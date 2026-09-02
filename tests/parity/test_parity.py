@@ -79,13 +79,17 @@ class _Gap:
     """One documented upstream-corpus text defect for a fixture.
 
     ``oracle_marker`` identifies (by substring, post-normalisation) the oracle
-    paragraph to drop from the ordered subsequence check. ``absent_phrase`` is
-    the correctly-ordered text the current corpus cannot produce; the test
-    asserts it is *not* in the rendered output, so a later Track B converter fix
-    turns this into a visible failure that says "re-grade this fixture".
+    paragraph the scramble sits in. That paragraph is not dropped wholesale:
+    ``keep`` is its leading part that the reader *does* render correctly and that
+    stays in the ordered subsequence check, so a regression that drops the
+    good half still fails. ``absent_phrase`` is the correctly-ordered text the
+    current corpus cannot produce; the test asserts it is *not* in the rendered
+    output, so a later Track B converter fix turns this into a visible failure
+    that says "re-grade this fixture".
     """
 
     oracle_marker: str
+    keep: str
     absent_phrase: str
     note: str
 
@@ -99,6 +103,7 @@ _KNOWN_GAPS: dict[str, list[_Gap]] = {
     "corp-act-s3": [
         _Gap(
             oracle_marker="Despite section 2H of the",
+            keep="this Act as applying in those Territories is a law of the Commonwealth.",
             absent_phrase="Despite section 2H of the Acts Interpretation Act 1901",
             note="subsec (2)(b) trailing sentence; defect #1 in corp-act-s3.expected.md",
         ),
@@ -106,11 +111,20 @@ _KNOWN_GAPS: dict[str, list[_Gap]] = {
     "itaa97-figure": [
         _Gap(
             oracle_marker="The Commissioner can allow you to adopt an accounting period",
+            keep=(
+                "Note 1: The Commissioner can allow you to adopt an accounting "
+                "period ending on a day other than 30 June."
+            ),
             absent_phrase="See section 18 of the Income Tax Assessment Act 1936",
             note="subsec (2)(b) Note 1 (marker 10); defect #1 in itaa97-figure.expected.md",
         ),
         _Gap(
             oracle_marker="An accounting period ends, and a new accounting period starts",
+            keep=(
+                "Note 2: An accounting period ends, and a new accounting period "
+                "starts, when a partnership becomes, or ceases to be, a VCLP, an "
+                "ESVCLP, an AFOF or a VCMP."
+            ),
             absent_phrase="See section 18A of the Income Tax Assessment Act 1936",
             note="subsec (2)(b) Note 2 (marker 11); defect #1 in itaa97-figure.expected.md",
         ),
@@ -301,16 +315,21 @@ def _check_fixture(name: str) -> None:
     plain, md = _render_fixture(name)
     haystack = _normalise(plain)
     gaps = _KNOWN_GAPS.get(name, [])
-    gap_markers = [_normalise(g.oracle_marker) for g in gaps]
 
     oracle = [_normalise(p) for p in _oracle_paragraphs(md)]
     assert oracle, "[" + name + "] parsed zero oracle paragraphs"
 
-    must_match = [
-        p
-        for p in oracle
-        if not any(marker and marker in p for marker in gap_markers)
-    ]
+    # For a known-gap paragraph, keep only its correctly-rendered leading half in
+    # the ordered check; the scrambled tail is covered by the absent assertion
+    # below.
+    must_match: list[str] = []
+    for paragraph in oracle:
+        keep = None
+        for gap in gaps:
+            if _normalise(gap.oracle_marker) in paragraph:
+                keep = _normalise(gap.keep)
+                break
+        must_match.append(keep if keep is not None else paragraph)
     _assert_ordered_subsequence(must_match, haystack, name=name)
 
     for gap in gaps:
@@ -330,6 +349,10 @@ def _check_fixture(name: str) -> None:
 
 def test_corp_act_s3_parity() -> None:
     _check_fixture("corp-act-s3")
+
+
+def test_corp_act_s9AB_parity() -> None:
+    _check_fixture("corp-act-s9AB")
 
 
 def test_corp_act_s3_small_business_guide_parity() -> None:

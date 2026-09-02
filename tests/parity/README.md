@@ -48,10 +48,12 @@ end of the sentence). The plan assigns U1 to **Track B**, not to
 rendering-fidelity Tasks 3-7, and each instance is written up in the fixture's
 own `## Known corpus/XML defects` section. For each gap the harness:
 
-1. drops the affected oracle paragraph from the ordered check, and
-2. asserts the correctly-ordered phrase is **absent** from the render, so the
-   test fails loudly (telling you to re-grade the fixture) if a Track B fix
-   later lands.
+1. keeps the paragraph's correctly-rendered leading half (`_Gap.keep`) in the
+   ordered check, so a regression that drops the good half still fails, and
+   removes only the scrambled tail, and
+2. asserts the correctly-ordered phrase (`_Gap.absent_phrase`) is **absent** from
+   the render, so the test fails loudly (telling you to re-grade the fixture) if
+   a Track B fix later lands.
 
 Do not add entries here to silence a genuine rendering regression. If a
 must-match paragraph stops matching and it is not a Track B U1 scramble, that is

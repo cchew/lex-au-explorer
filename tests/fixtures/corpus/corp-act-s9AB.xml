@@ -1,0 +1,83 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<akomaNtoso xmlns="http://docs.oasis-open.org/legaldocml/ns/akn/3.0">
+  <act name="act">
+    <meta>
+      <!-- Trimmed real-corpus fixture (lex-au-explorer Task 9). Source: lex-au/repo/corpus/xml/corporations-act-2001.xml. Kept: full <identification>. Dropped from <meta>: <lifecycle>, <temporalData>. Body trimmed to the single target subtree. -->
+      <identification source="#lex-au">
+        <FRBRWork>
+          <FRBRthis value="/akn/au/act/2001/50/!main"/>
+          <FRBRuri value="/akn/au/act/2001/50"/>
+          <FRBRdate date="2001-01-01" name="Generation"/>
+          <FRBRauthor href="#parliament"/>
+          <FRBRcountry value="au"/>
+          <FRBRsubtype value="act"/>
+          <FRBRnumber value="50"/>
+          <FRBRname value="corporations-act-2001"/>
+          <FRBRprescriptive value="true"/>
+          <FRBRauthoritative value="true"/>
+        </FRBRWork>
+        <FRBRExpression>
+          <FRBRthis value="/akn/au/act/2001/50/eng@2026-07-01/!main"/>
+          <FRBRuri value="/akn/au/act/2001/50/eng@2026-07-01"/>
+          <FRBRdate date="2026-07-01" name="Generation"/>
+          <FRBRauthor href="#parliament"/>
+          <FRBRlanguage language="eng"/>
+        </FRBRExpression>
+        <FRBRManifestation>
+          <FRBRthis value="/akn/au/act/2001/50/eng@2026-07-01/!main.akn"/>
+          <FRBRuri value="/akn/au/act/2001/50/eng@2026-07-01/!main.akn"/>
+          <FRBRdate date="2026-08-17" name="Generation"/>
+          <FRBRauthor href="#lex-au"/>
+        </FRBRManifestation>
+      </identification>
+    </meta>
+    <body>
+      <section eId="chapter-1__part-1.2__dvs-1__sec-9AB">
+        <num>9AB</num>
+        <heading>Meaning of asset</heading>
+        <subsection eId="chapter-1__part-1.2__dvs-1__sec-9AB__subsec-1">
+          <num>1</num>
+          <content>
+            <p>	(1)	An <b><i>asset</i></b> (except in relation to a sub-fund of a CCIV) is property, or a right, of any kind, and includes:</p>
+          </content>
+          <paragraph eId="chapter-1__part-1.2__dvs-1__sec-9AB__subsec-1__para-a">
+            <num>a</num>
+            <content>
+              <p>any legal or equitable estate or interest (whether present or future, vested or contingent, tangible or intangible, in real or personal property) of any kind; and</p>
+            </content>
+          </paragraph>
+          <paragraph eId="chapter-1__part-1.2__dvs-1__sec-9AB__subsec-1__para-b">
+            <num>b</num>
+            <content>
+              <p>any chose in action; and</p>
+            </content>
+          </paragraph>
+          <paragraph eId="chapter-1__part-1.2__dvs-1__sec-9AB__subsec-1__para-c">
+            <num>c</num>
+            <content>
+              <p>any right, interest or claim of any kind including rights, interests or claims in or in relation to property (whether arising under an instrument or otherwise, and whether liquidated or unliquidated, certain or contingent, accrued or accruing); and</p>
+            </content>
+          </paragraph>
+          <paragraph eId="chapter-1__part-1.2__dvs-1__sec-9AB__subsec-1__para-d">
+            <num>d</num>
+            <content>
+              <p>	(d)	any CGT asset within the meaning of the <i>Income Tax Assessment Act 1997</i>.</p>
+            </content>
+          </paragraph>
+        </subsection>
+        <subsection eId="chapter-1__part-1.2__dvs-1__sec-9AB__subsec-2">
+          <num>2</num>
+          <content>
+            <p>	(2)	The <b><i>assets</i></b> of a financial services licensee are all the licensee’s assets (as defined in subsection (1)), whether or not the assets are used in connection with the licensee’s Australian financial services licence.</p>
+          </content>
+        </subsection>
+        <subsection eId="chapter-1__part-1.2__dvs-1__sec-9AB__subsec-3">
+          <num>3</num>
+          <content>
+            <p>	(3)	An <b><i>asset</i></b> of a sub-fund of a CCIV has the meaning given by section 1233H.</p>
+          </content>
+        </subsection>
+      </section>
+    </body>
+  </act>
+</akomaNtoso>
