@@ -10,7 +10,7 @@ import typer
 
 from build.metadata import load_corpus_index, build_site_index, ActMeta
 from build.assets import copy_figure_assets
-from build.bundle import AKN, build_toc, build_sections, _local_tag
+from build.bundle import build_toc, build_sections, _local_tag
 from build.ir import Node
 from build.refindex import build_ref_index
 from build.stylemap import HtmlStyleMap, StyleMap
@@ -203,7 +203,7 @@ def _make_on_parsed(
             act_ir_dir = emit_ir_dir / slug
             act_ir_dir.mkdir(parents=True, exist_ok=True)
             for eid, node in pairs:
-                (act_ir_dir / f"{eid}.json").write_text(
+                (act_ir_dir / f"{Path(eid).name}.json").write_text(
                     json.dumps(node.to_dict())
                 )
 
@@ -331,6 +331,7 @@ def main(
         verification_path=verification_path,
         style_map_path=style_map,
         emit_ir_dir=emit_ir,
-        corpus_images_dir=corpus_images or (corpus_dir / "images"),
+        # None -> build_site owns the single <corpus-dir>/images default.
+        corpus_images_dir=corpus_images,
     )
     typer.echo(f"Site data written to {out}")

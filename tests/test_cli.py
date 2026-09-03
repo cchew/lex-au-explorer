@@ -11,10 +11,14 @@ from build.cli import (
     app,
     build_site,
     _collect_section_eids,
+    _make_on_parsed,
     _nav_eids,
     _write_split_bundle,
     _TermResolverAdapter,
 )
+from build.ir import Node
+from build.render import render_section
+from build.stylemap import HtmlStyleMap
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -447,6 +451,33 @@ def test_split_bundle_covers_every_source_section_exactly_once(tmp_path):
             seen[eid] = seen.get(eid, 0) + 1
 
     assert seen == {eid: 1 for eid in source_section_eids}
+
+
+def test_make_on_parsed_flips_figure_asset_and_emits_real_img(tmp_path):
+    """The two-pass figure marking is the only path that can emit a real
+    <img>: when --corpus-images holds the matching file, the parsed figure
+    node's `asset` flips True and the style map renders <img src="/data/...">.
+    """
+    images = tmp_path / "images"
+    images.mkdir()
+    (images / "act-fig-1.png").write_bytes(b"PNGDATA")
+    out_dir = tmp_path / "data"
+    out_dir.mkdir()
+
+    fig = Node(
+        "figure",
+        {"src": "corpus/images/act-fig-1.png", "alt": "", "asset": False},
+    )
+    section = Node("section", {"eid": "part-1__sec-1"}, [fig])
+
+    _make_on_parsed("act", None, images, out_dir)([("part-1__sec-1", section)])
+
+    assert fig.attrs["asset"] is True
+    assert (out_dir / "images" / "act-fig-1.png").read_bytes() == b"PNGDATA"
+
+    html = render_section(section, HtmlStyleMap())
+    assert '<img src="/data/images/act-fig-1.png" alt="">' in html
+    assert "akn-figure-missing" not in html
 
 
 def test_collect_section_eids_recurses_into_divisions():

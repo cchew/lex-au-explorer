@@ -34,7 +34,11 @@ def copy_figure_assets(
     Does not raise on a missing source directory. Logs a one-line count.
     """
     basenames = {
-        os.path.basename(s) for s in srcs if s and s.strip()
+        base
+        for s in srcs
+        if s and s.strip()
+        for base in (os.path.basename(s),)
+        if base
     }
     missing: set[str] = set()
     if not basenames:
