@@ -5,6 +5,11 @@ web/node_modules/
 web/dist/
 web/data/
 web/test-results/
+
+# Full-corpus predeploy output (~6000 per-Act .json/.xml). The 4 minimal E2E
+# fixture files under web/public/data/ are already tracked and stay tracked;
+# this only keeps the generated corpus out of `git add -A`.
+web/public/data/
 *.egg-info/
 
 # Local Netlify folder
