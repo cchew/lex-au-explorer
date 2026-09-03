@@ -42,20 +42,33 @@ class Node:
 | `kind` | `attrs` | Meaning / children |
 |--------|---------|--------------------|
 | `section` | `eid`, `num`, `heading` | Top provision. Children: `provision` / `content` / `note` / `example` / `penalty` / `table` / `list` / `figure` / `raw` |
-| `provision` | `eid`, `level` (`subsection`\|`paragraph`\|`subparagraph`\|`clause`\|`subclause`), `num` | Numbered sub-unit. `num` is the bare token (`"1"`, `"a"`), never parenthesised, never in any `text` node |
+| `provision` | `eid`, `level` (`subsection`\|`paragraph`\|`subparagraph`\|`clause`\|`subclause`), `num`, `heading?` | Numbered sub-unit. `num` is the bare token (`"1"`, `"a"`), never parenthesised, never in any `text` node. `heading` is rare (a headed subsection) and lifted by `_apply_identity` |
 | `content` | -- | A run of one or more `para`s |
 | `para` | -- | One paragraph. Children: **inline** nodes only |
-| `note` | `label` | Authorial note. `label` is the leading `Note:` / `Note 1:` carried from source; the rest is `content` children |
-| `example` | `eid?`, `num?` | `hcontainer name="example"` |
-| `penalty` | `eid?` | `hcontainer name="penalty"` |
-| `list` | `eid?` | `blockList`. Children: optional `intro`, then `item`* |
+| `note` | `label`, `eid?`, `num?`, `heading?` | Authorial note. `label` is the leading `Note:` / `Note 1:` carried from source; the rest is `content` children. `eid` / `num` / `heading` come from `_apply_identity` and are almost always absent on `<authorialNote>` |
+| `example` | `eid?`, `num?`, `heading?` | `hcontainer name="example"` (all three via `_apply_identity`) |
+| `penalty` | `eid?`, `num?`, `heading?` | `hcontainer name="penalty"` (all three via `_apply_identity`; `num` / `heading` rare) |
+| `list` | `eid?`, `num?`, `heading?` | `blockList` (all three via `_apply_identity`). Children: optional `intro`, then `item`* |
 | `intro` | -- | `listIntroduction` / lead-in. Children: inline |
-| `item` | `num?` | One `blockList` `item`. Children: inline or `para` |
-| `table` | `eid?` | Children: `row` |
+| `item` | `num?` | One `blockList` `item`. **No** `_apply_identity` call: only `num` (its own `<num>` text) is lifted, never `eid` / `heading`. Children: `text`, inline, `para`, or -- via the total block fallthrough -- any **block** node (`list`, `content`, `raw`, ...) |
+| `table` | `eid?`, `num?`, `heading?` | `blockList`-style identity via `_apply_identity`. Children: `row` |
 | `row` | `header` (bool) | Children: `cell` |
 | `cell` | `td` (bool -- else `th`), `colspan?`, `rowspan?` | Children: a single `text` node (cells are text-only across the whole corpus) or empty |
 | `figure` | `src`, `alt`, `asset` (bool -- image copied vs missing) | `<figure>`/`<img>`. Method-statement and rate diagrams |
-| `raw` | `tag` | Unrecognised **block** element; children recursed so text is never dropped |
+| `raw` | `tag` | Unrecognised **block** element. Children: a leading `text` node (the element's own `.text`), each child run through `_parse_block` (so `raw` can hold **block** children), and each child's `.tail` as a further `text` node -- nothing is dropped |
+
+### `_apply_identity`
+
+`build/parse.py::_apply_identity(node, el)` lifts, when present as attributes /
+direct children of `el`:
+
+* `el.get("eId")` -> `attrs["eid"]`
+* direct child `<num>` text (stripped) -> `attrs["num"]`
+* direct child `<heading>` text (`itertext`, stripped) -> `attrs["heading"]`
+
+It is called for `section`, `provision`, `example`, `penalty`, `note`, `list`
+and `table`. It is **not** called for `item` (which lifts only `num`, by hand),
+`content`, `para`, `intro`, `row`, `cell`, `figure`, `raw` or any inline kind.
 
 ## Inline kinds
 
@@ -66,10 +79,31 @@ Only ever children of `para` / `intro` / `item` / `cell`.
 | `text` | -- | Leaf text in `node.text`, unescaped; Stage 2 escapes |
 | `emphasis` | `style` (`italic`\|`bold`) | Wraps inline children; nests |
 | `term` | `term` (lower-cased key), `display` | A defined-term usage |
-| `ref` | `href`, `text`, `target_eid?`, `status` (`resolved`\|`ambiguous`\|`unresolved`) | Cross-reference; always same-Act. `target_eid` present only when `status == "resolved"` |
+| `ref` | `href`, `text`, `target_eid?`, `status` (`resolved`\|`ambiguous`\|`unresolved`) | Cross-reference; always same-Act. `target_eid` present only when `status == "resolved"`. Resolution is delegated to `RefIndex.resolve` (see below) |
 | `date` | `iso?` | `<date>` -- styled span, text verbatim |
 | `quantity` | `refers_to?` | `<quantity>` -- styled span, text verbatim |
 | `inline_raw` | `tag` | **Any** unrecognised inline element (`<def>`, `<role>`, `<mod>`, `<sup>`, ...). The parser recurses children and emits `node.text` + every child `.tail`. This is the mandatory generic fallback: an if/elif inline chain with no else silently drops operative text |
+
+## Cross-reference resolution (`RefIndex.resolve`)
+
+`build/parse.py::_parse_ref` calls, for every `<ref>`:
+
+```python
+RefIndex.resolve(
+    href: str,               # the raw "#..." fragment
+    from_eid: str,           # the enclosing section's eId
+    display_text: str = "",  # the ref's visible text ("section 4-15") --
+                             #   needed to recover ITAA hyphen-truncated hrefs
+    following_text: str = "",  # the ref element's .tail -- "of the {Other Act}"
+                             #   here means the ref names a *different* Act, so
+                             #   any same-Act target is declined (unresolved)
+) -> Resolution               # .status in {resolved, ambiguous, unresolved};
+                              # .target_eid set only when resolved
+```
+
+`resolve` also increments `RefIndex.tally` (a `Counter` over the three statuses)
+which the build writes to `ref-tally.json`. A third-party style map never calls
+`resolve` itself -- it only reads `status` / `target_eid` off the `ref` node.
 
 ## Stage 2: the style map
 
