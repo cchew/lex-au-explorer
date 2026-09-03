@@ -1,0 +1,22 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<akomaNtoso xmlns="http://docs.oasis-open.org/legaldocml/ns/akn/3.0">
+  <act name="act">
+    <body>
+      <section eId="part-2__sec-12">
+        <num>12</num>
+        <heading>Failure to notify the Registrar</heading>
+        <subsection eId="part-2__sec-12__subsec-1">
+          <num>1</num>
+          <content>
+            <p>A person commits an offence if the person fails to notify the Registrar within 14 days.</p>
+          </content>
+          <hcontainer name="penalty" eId="part-2__sec-12__subsec-1__penalty-1">
+            <content>
+              <p>Penalty: 50 penalty units.</p>
+            </content>
+          </hcontainer>
+        </subsection>
+      </section>
+    </body>
+  </act>
+</akomaNtoso>

@@ -41,6 +41,7 @@ except ImportError:  # pragma: no cover - import shape guard only
 _FIXTURES = Path(__file__).parent.parent / "fixtures" / "corpus"
 
 _EID_RE = re.compile(r"^- eId:\s*`([^`]+)`", re.MULTILINE)
+_ORACLE_MARKER_RE = re.compile(r"^\(([0-9A-Za-z]{1,4})\)\s")
 _HEADING_RE = re.compile(r"^##\s+", re.MULTILINE)
 _TABLE_SEP_CELL_RE = re.compile(r"^:?-+:?$")
 _PAREN_MARKER_RE = re.compile(r"\(([0-9A-Za-z]{1,4})\)")
@@ -212,6 +213,17 @@ def _table_rows(block: list[str]) -> list[str]:
     return cells
 
 
+def _oracle_markers(md: str) -> list[str]:
+    """Bare provision markers the oracle carries (``(1)`` -> ``1``, ``(a)`` ->
+    ``a``), in first-seen order, deduplicated. Used for the duplication check."""
+    seen: list[str] = []
+    for para in _oracle_paragraphs(md):
+        m = _ORACLE_MARKER_RE.match(para)
+        if m and m.group(1) not in seen:
+            seen.append(m.group(1))
+    return seen
+
+
 def _oracle_paragraphs(md: str) -> list[str]:
     """Ordered list of oracle paragraphs (raw, pre-normalisation)."""
     out: list[str] = []
@@ -332,6 +344,20 @@ def _check_fixture(name: str) -> None:
         must_match.append(keep if keep is not None else paragraph)
     _assert_ordered_subsequence(must_match, haystack, name=name)
 
+    # G4 duplication guard. `_normalise` collapses "(1) 1" to "1 1", so a
+    # provision marker that leaked into the body a second time (numbering
+    # normalisation misfire) still subsequence-matches. Assert no marker the
+    # oracle shows once appears doubled and adjacent in the rendered text.
+    for marker in _oracle_markers(md):
+        doubled = re.compile(
+            r"(?<!\S)" + re.escape(marker) + r"\s+" + re.escape(marker) + r"(?!\S)"
+        )
+        assert not doubled.search(haystack), (
+            "[" + name + "] provision marker " + repr(marker) + " appears "
+            "doubled in the rendered text -- numbering normalisation regression "
+            "(G4 duplication)."
+        )
+
     for gap in gaps:
         absent = _normalise(gap.absent_phrase)
         assert absent not in haystack, (
@@ -369,6 +395,39 @@ def test_itaa97_figure_parity() -> None:
 
 def test_sched_clause_parity() -> None:
     _check_fixture("sched-clause")
+
+
+def test_blocklist_items_parity() -> None:
+    _check_fixture("blocklist-items")
+
+
+def test_blocklist_items_render_markers() -> None:
+    """S5: list introduction + every item marker/body render, in order."""
+    root = ET.parse(str(_FIXTURES / "blocklist-items.xml")).getroot()
+    target = root.find(".//*[@eId='part-1__sec-5']")
+    assert target is not None
+    node = parse_section(target, build_ref_index([]))
+    html = render_section(node, HtmlStyleMap())
+    assert '<div class="akn-list">' in html
+    assert '<p class="akn-intro">the following information:</p>' in html
+    for marker in ("(a)", "(b)", "(c)"):
+        assert '<span class="akn-num">' + marker + "</span>" in html
+    assert "the date on which any person ceased to be a member." in html
+
+
+def test_penalty_block_parity() -> None:
+    _check_fixture("penalty-block")
+
+
+def test_penalty_block_renders_penaltytext() -> None:
+    """G7: hcontainer name="penalty" renders as its own akn-penaltytext block."""
+    root = ET.parse(str(_FIXTURES / "penalty-block.xml")).getroot()
+    target = root.find(".//*[@eId='part-2__sec-12']")
+    assert target is not None
+    node = parse_section(target, build_ref_index([]))
+    html = render_section(node, HtmlStyleMap())
+    assert '<div class="akn-penaltytext">' in html
+    assert "Penalty: 50 penalty units." in html
 
 
 def test_extract_docx_importable() -> None:

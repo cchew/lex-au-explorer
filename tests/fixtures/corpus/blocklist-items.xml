@@ -1,0 +1,32 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<akomaNtoso xmlns="http://docs.oasis-open.org/legaldocml/ns/akn/3.0">
+  <act name="act">
+    <body>
+      <section eId="part-1__sec-5">
+        <num>5</num>
+        <heading>Register of members</heading>
+        <subsection eId="part-1__sec-5__subsec-1">
+          <num>1</num>
+          <content>
+            <p>A company must keep a register of members containing:</p>
+          </content>
+          <blockList eId="part-1__sec-5__subsec-1__list-1">
+            <listIntroduction>the following information:</listIntroduction>
+            <item eId="part-1__sec-5__subsec-1__list-1__item-a">
+              <num>a</num>
+              <p>the name and address of each member; and</p>
+            </item>
+            <item eId="part-1__sec-5__subsec-1__list-1__item-b">
+              <num>b</num>
+              <p>the date on which each person was entered in the register as a member; and</p>
+            </item>
+            <item eId="part-1__sec-5__subsec-1__list-1__item-c">
+              <num>c</num>
+              <p>the date on which any person ceased to be a member.</p>
+            </item>
+          </blockList>
+        </subsection>
+      </section>
+    </body>
+  </act>
+</akomaNtoso>
