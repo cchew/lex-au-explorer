@@ -165,12 +165,15 @@ def test_table_without_header_row_is_all_tbody() -> None:
         Node("row", children=[Node("cell", {"td": True}, [Node("text", text="b")])]),
     ])
     out = render_section(n, S)
-    assert out == ('<table class="akn-table"><tbody><tr><td>a</td></tr>'
-                   "<tr><td>b</td></tr></tbody></table>")
+    assert out == ('<div class="akn-table-scroll"><table class="akn-table">'
+                   "<tbody><tr><td>a</td></tr>"
+                   "<tr><td>b</td></tr></tbody></table></div>")
 
 
 def test_table_empty_has_no_thead_or_tbody() -> None:
-    assert S._table(Node("table"), []) == '<table class="akn-table"></table>'
+    assert S._table(Node("table"), []) == (
+        '<div class="akn-table-scroll"><table class="akn-table"></table></div>'
+    )
 
 
 def test_no_script_or_event_handlers_survive_a_full_walk() -> None:

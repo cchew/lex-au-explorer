@@ -148,7 +148,14 @@ class HtmlStyleMap:
             row for i, row in enumerate(children) if i != header_idx
         ]
         tbody = f"<tbody>{''.join(body_rows)}</tbody>" if body_rows else ""
-        return f'<table class="akn-table">{thead}{tbody}</table>'
+        # Wrapper owns the horizontal scroll; the <table> keeps display:table +
+        # border-collapse (both inert on a display:block element -> doubled
+        # borders). CSS: .akn-table-scroll { overflow-x: auto }.
+        return (
+            '<div class="akn-table-scroll">'
+            f'<table class="akn-table">{thead}{tbody}</table>'
+            "</div>"
+        )
 
     def _row(self, node: Node, children: list[str]) -> str:
         return f"<tr>{''.join(children)}</tr>"

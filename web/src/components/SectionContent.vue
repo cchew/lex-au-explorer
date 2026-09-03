@@ -65,7 +65,7 @@ function onMouseLeave() {
 .section-html :deep(.akn-clause),
 .section-html :deep(.akn-subclause) {
   display: grid;
-  grid-template-columns: 2.75rem 1fr;
+  grid-template-columns: minmax(2.75rem, max-content) 1fr;
   column-gap: var(--s-2);
   margin: var(--s-2) 0;
 }
@@ -78,13 +78,18 @@ function onMouseLeave() {
   text-align: left;
 }
 .section-html :deep(.akn-body > p:first-child) { margin-top: 0; }
+.section-html :deep(.akn-provision-heading) {
+  font-weight: 600;
+  color: var(--color-ink);
+  margin-right: 0.35rem;
+}
 
 /* blockList: chapeau paragraph plus grid items, indented like a paragraph. */
 .section-html :deep(.akn-list) { margin: var(--s-2) 0 var(--s-2) var(--s-4); }
 .section-html :deep(.akn-intro) { margin: var(--s-2) 0; }
 .section-html :deep(.akn-item) {
   display: grid;
-  grid-template-columns: 2.75rem 1fr;
+  grid-template-columns: minmax(2.75rem, max-content) 1fr;
   column-gap: var(--s-2);
   margin: var(--s-2) 0;
 }
@@ -114,14 +119,16 @@ function onMouseLeave() {
    Task 4 parser split), not a CSS ::before -- source paragraphs already
    begin "Note:" / "Note 1:", so ::before would double it. */
 .section-html :deep(.akn-notetext) {
+  display: flow-root;
   font-size: 0.8125rem;
   color: var(--color-ink-2);
   margin: var(--s-2) 0 var(--s-2) var(--s-4);
 }
 .section-html :deep(.akn-note-label) {
+  float: left;
+  margin-right: 0.35rem;
   font-weight: 600;
   color: var(--color-ink-2);
-  margin-right: 0.25rem;
 }
 
 /* Example: shaded box with a left rule. */
@@ -143,12 +150,16 @@ function onMouseLeave() {
 }
 
 /* Tables: bordered, shaded header row; a wide table scrolls inside its own
-   box rather than pushing the page sideways. */
-.section-html :deep(.akn-table) {
-  display: block;
+   wrapper rather than pushing the page sideways. The scroll lives on the
+   wrapper so the <table> can keep display:table + border-collapse (both inert
+   under display:block, which doubled every border). */
+.section-html :deep(.akn-table-scroll) {
   overflow-x: auto;
-  border-collapse: collapse;
   margin: var(--s-3) 0;
+}
+.section-html :deep(.akn-table) {
+  display: table;
+  border-collapse: collapse;
   font-size: 0.8125rem;
   width: 100%;
 }
