@@ -55,6 +55,26 @@ def test_subsection_marker_has_parens() -> None:
     assert '<span class="akn-num">(1)</span>' in render_section(n, S)
 
 
+def test_provision_heading_is_rendered_when_present() -> None:
+    n = Node("section", {}, [Node(
+        "provision",
+        {"level": "clause", "num": "2", "eid": "sch__cl2", "heading": "Application"},
+        [Node("content", children=[Node("para", children=[Node("text", text="Body.")])])],
+    )])
+    html = render_section(n, S)
+    assert '<span class="akn-provision-heading">Application</span>' in html
+    assert html.index("akn-provision-heading") < html.index("Body.")
+
+
+def test_provision_without_heading_emits_no_heading_span() -> None:
+    n = Node("section", {}, [Node(
+        "provision",
+        {"level": "subsection", "num": "1", "eid": "s__ss1"},
+        [Node("content", children=[Node("para", children=[Node("text", text="Body.")])])],
+    )])
+    assert "akn-provision-heading" not in render_section(n, S)
+
+
 def test_missing_figure_renders_placeholder_not_blank() -> None:
     n = Node("section", {}, [Node("figure", {"src": "x.png", "alt": "Method statement", "asset": False})])
     html = render_section(n, S)

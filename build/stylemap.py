@@ -81,14 +81,20 @@ class HtmlStyleMap:
         level = str(node.attrs.get("level", "") or "")
         eid = str(node.attrs.get("eid", "") or "")
         num = str(node.attrs.get("num", "") or "")
+        heading = str(node.attrs.get("heading", "") or "")
         marker = ""
         if num:
             marker = self.MARKERS.get(level, "{num}").format(num=num)
         id_attr = f' id="{_esc(eid)}"' if eid else ""
+        heading_span = (
+            f'<span class="akn-provision-heading">{_esc(heading)}</span>'
+            if heading
+            else ""
+        )
         return (
             f'<div class="akn-{_esc(level)}"{id_attr}>'
             f'<span class="akn-num">{_esc(marker)}</span>'
-            f'<div class="akn-body">{"".join(children)}</div>'
+            f'<div class="akn-body">{heading_span}{"".join(children)}</div>'
             "</div>"
         )
 
