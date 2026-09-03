@@ -100,6 +100,15 @@ function flattenLeafEids(node: TocNode): string[] {
   return eids;
 }
 
+function findTocNode(nodes: TocNode[], eid: string): TocNode | null {
+  for (const node of nodes) {
+    if (node.eid === eid) return node;
+    const found = findTocNode(node.children, eid);
+    if (found) return found;
+  }
+  return null;
+}
+
 // Coarse "how far into the Act" bucket for analytics -- a raw eid is
 // high-cardinality noise in Umami's event-data view; what's actually
 // informative is whether people jump around near the front or read deep.
@@ -136,7 +145,23 @@ async function scrollToSection(eid: string) {
     document.querySelector(".content-pane")?.scrollIntoView({ behavior: "smooth", block: "start" });
     return;
   }
-  document.getElementById(eid)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const el = document.getElementById(eid);
+  if (el) {
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+  // Resolved #part-* / #dvs-* links point at a container eid that the DOM
+  // renders no `id` for (only sections and provisions get one). Fall back to
+  // that container's first descendant leaf section so the reader still moves.
+  const node = bundle.value ? findTocNode(bundle.value.toc, eid) : null;
+  if (!node) return;
+  for (const leafEid of flattenLeafEids(node)) {
+    const leafEl = document.getElementById(leafEid);
+    if (leafEl) {
+      leafEl.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+  }
 }
 
 async function selectSection(eid: string) {
