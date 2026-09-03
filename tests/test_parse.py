@@ -126,6 +126,41 @@ def test_resolved_ref_carries_target_eid() -> None:
     assert ref.attrs["target_eid"] == "chapter-2J__part-2J.1__sec-601"
 
 
+def test_cross_act_ref_tail_declines_resolution() -> None:
+    """`<ref href="#sec-5">section 5</ref> of the Foo Act 1912` must not link,
+    even though this Act has a `sec-5` -- the tail names a different Act (I2)."""
+    nav = ["chapter-1__part-1.1__sec-5", "chapter-1__part-1.1__sec-9"]
+    node = parse_section(
+        _sec(
+            "<content><p>see <ref href=\"#sec-5\">section 5</ref> of the "
+            "Foo Act 1912 for context.</p></content>",
+            eid="chapter-1__part-1.1__sec-9",
+        ),
+        build_ref_index(nav),
+    )
+    ref = _find(node, lambda n: n.kind == "ref")
+    assert ref is not None
+    assert ref.attrs["status"] == "unresolved"
+    assert "target_eid" not in ref.attrs
+
+
+def test_same_act_ref_tail_still_resolves() -> None:
+    """The `of the` guard must not fire on `... of the Act`."""
+    nav = ["chapter-1__part-1.1__sec-5", "chapter-1__part-1.1__sec-9"]
+    node = parse_section(
+        _sec(
+            "<content><p>see <ref href=\"#sec-5\">section 5</ref> of the "
+            "Act.</p></content>",
+            eid="chapter-1__part-1.1__sec-9",
+        ),
+        build_ref_index(nav),
+    )
+    ref = _find(node, lambda n: n.kind == "ref")
+    assert ref is not None
+    assert ref.attrs["status"] == "resolved"
+    assert ref.attrs["target_eid"] == "chapter-1__part-1.1__sec-5"
+
+
 def test_date_and_quantity_kinds() -> None:
     node = parse_section(
         _sec(

@@ -370,8 +370,11 @@ def _parse_ref(
 ) -> Node:
     href = el.get("href", "") or ""
     text = "".join(el.itertext())
+    following_text = el.tail or ""
     node = Node("ref", {"href": href, "text": text})
-    resolution = ref_index.resolve(href, section_eid, display_text=text)
+    resolution = ref_index.resolve(
+        href, section_eid, display_text=text, following_text=following_text
+    )
     node.attrs["status"] = resolution.status
     if resolution.status == "resolved" and resolution.target_eid is not None:
         node.attrs["target_eid"] = resolution.target_eid

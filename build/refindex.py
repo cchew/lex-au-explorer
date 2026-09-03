@@ -36,6 +36,19 @@ _STRIPPABLE_TAIL = re.compile(
     r"^(?:subsec|para|subpara|sub-para|item|subitem|subclause|clause)-", re.IGNORECASE
 )
 
+# Text immediately following a <ref>: "... of the <X>". If <X> is not "Act" /
+# "this Act" then the ref names a *different* Act (spike F.5 cross-Act scramble)
+# and any same-Act target is a wrong link.
+_OF_THE_RE = re.compile(r"^\s*of the\s+", re.IGNORECASE)
+_SAME_ACT_CONTINUATION_RE = re.compile(r"(?:this\s+Act|Act)\b", re.IGNORECASE)
+
+
+def _names_other_act(following_text: str) -> bool:
+    if not _OF_THE_RE.match(following_text):
+        return False
+    rest = _OF_THE_RE.sub("", following_text, count=1)
+    return _SAME_ACT_CONTINUATION_RE.match(rest) is None
+
 
 class _TermResolver(Protocol):
     """Minimal duck type this module needs from a definition resolver.
@@ -85,9 +98,13 @@ class RefIndex:
     # -- public API ---------------------------------------------------------
 
     def resolve(
-        self, href: str, from_eid: str, display_text: str = ""
+        self,
+        href: str,
+        from_eid: str,
+        display_text: str = "",
+        following_text: str = "",
     ) -> Resolution:
-        result = self._resolve(href, from_eid, display_text)
+        result = self._resolve(href, from_eid, display_text, following_text)
         self.tally[result.status] += 1
         return result
 
@@ -104,12 +121,21 @@ class RefIndex:
         ]
 
     def _resolve(
-        self, href: str, from_eid: str, display_text: str
+        self,
+        href: str,
+        from_eid: str,
+        display_text: str,
+        following_text: str = "",
     ) -> Resolution:
         if not href or not href.startswith("#"):
             return _UNRESOLVED
         target = href[1:]
         if not target:
+            return _UNRESOLVED
+
+        # "<ref>section N</ref> of the {Other Act}" -- the trailing text names a
+        # different Act, so linking the fragment to a same-Act eId is wrong.
+        if _names_other_act(following_text):
             return _UNRESOLVED
 
         if target.startswith("term-"):
