@@ -25,7 +25,11 @@ from build.stylemap import HtmlStyleMap, StyleMap
 AKN_NS = "http://docs.oasis-open.org/legaldocml/ns/akn/3.0"
 AKN = f"{{{AKN_NS}}}"
 
-_STRUCTURAL_TAGS = {"part", "division", "subdivision", "chapter", "section"}
+# AKN 3.0 spells the element ``subDivision`` (camelCase); the lower-case
+# ``subdivision`` never occurs in the corpus but is kept for safety.
+_STRUCTURAL_TAGS = {
+    "part", "division", "subdivision", "subDivision", "chapter", "section",
+}
 
 __all__ = ["AKN", "AKN_NS", "build_toc", "build_sections", "_local_tag"]
 

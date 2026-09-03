@@ -22,7 +22,7 @@ DEFAULT_VERIFICATION_PATH = Path("web/verification.json")
 # Navigable element tags whose ``eId`` feeds the per-Act cross-reference index.
 _NAV_TAGS: frozenset[str] = frozenset(
     {
-        "section", "part", "division", "subdivision", "chapter",
+        "section", "part", "division", "subdivision", "subDivision", "chapter",
         "subsection", "paragraph", "subparagraph",
     }
 )
@@ -251,8 +251,12 @@ def _write_split_bundle(
     part_dir.mkdir(parents=True, exist_ok=True)
     part_section_eids: dict[str, set[str]] = {}
     for part in toc:
+        # A split Act can carry two top-level TOC nodes with the same eId
+        # (Corp Act has two ``chapter-7``; ITAA-97 repeats ``chapter-2`` /
+        # ``chapter-3``). Merge their section eIds instead of letting the
+        # second node's set overwrite the first.
         eids = _collect_section_eids(part)
-        part_section_eids[part["eid"]] = eids
+        part_section_eids.setdefault(part["eid"], set()).update(eids)
 
     for part_eid, eids in part_section_eids.items():
         part_sections = {k: v for k, v in sections.items() if k in eids}

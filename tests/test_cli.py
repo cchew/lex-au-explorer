@@ -382,6 +382,73 @@ def test_term_resolver_adapter_binds_frbr_uri_and_returns_result():
     assert result.section_eid == "part-1__sec-9"
 
 
+_AKN_NS = "http://docs.oasis-open.org/legaldocml/ns/akn/3.0"
+
+# Synthetic split Act exercising both C1 root causes at once:
+#  * a section nested under a camelCase <subDivision> (toc must recurse into it)
+#  * two top-level <chapter eId="chapter-7"> nodes (their section eIds must
+#    merge, not overwrite)
+_SPLIT_INVARIANT_XML = f"""<akomaNtoso xmlns="{_AKN_NS}"><act><body>
+  <chapter eId="chapter-7"><heading>Financial services first</heading>
+    <section eId="chapter-7__sec-760A"><heading>S1</heading>
+      <content><p>alpha</p></content></section>
+  </chapter>
+  <chapter eId="chapter-7"><heading>Financial services second</heading>
+    <section eId="chapter-7__sec-1101A"><heading>S2</heading>
+      <content><p>beta</p></content></section>
+  </chapter>
+  <chapter eId="chapter-1"><heading>Introduction</heading>
+    <division eId="chapter-1__dvs-1"><heading>D1</heading>
+      <subDivision eId="chapter-1__dvs-1__sdvs-A"><heading>SD A</heading>
+        <section eId="chapter-1__dvs-1__sdvs-A__sec-3"><heading>S3</heading>
+          <content><p>gamma</p></content></section>
+      </subDivision>
+    </division>
+  </chapter>
+</body></act></akomaNtoso>"""
+
+
+def test_split_bundle_covers_every_source_section_exactly_once(tmp_path):
+    """C1 invariant: every ``<section eId>`` in the source XML lands in exactly
+    one written split bundle. Regresses (1) toc not recursing into
+    ``<subDivision>`` and (2) same-eId top-level toc nodes overwriting each
+    other in ``_write_split_bundle``."""
+    from build.bundle import AKN as _AKN, build_sections, build_toc
+    from build.refindex import build_ref_index as _bri
+
+    root = ET.fromstring(_SPLIT_INVARIANT_XML)
+    source_section_eids = {
+        el.get("eId") for el in root.iter(f"{_AKN}section") if el.get("eId")
+    }
+    assert source_section_eids == {
+        "chapter-7__sec-760A",
+        "chapter-7__sec-1101A",
+        "chapter-1__dvs-1__sdvs-A__sec-3",
+    }
+
+    toc = build_toc(root)
+    # toc must now descend through <subDivision> to reach the nested section.
+    assert _collect_section_eids(
+        next(n for n in toc if n["eid"] == "chapter-1")
+    ) == {"chapter-1__dvs-1__sdvs-A__sec-3"}
+
+    sections, _ = build_sections(root, _bri([]))
+    bundle_meta = {"title": "Synthetic Split Act", "split_by_part": True,
+                   "toc": toc, "sections": sections, "definitions": {}}
+
+    out_dir = tmp_path / "data"
+    out_dir.mkdir()
+    _write_split_bundle(out_dir, "synthetic-split", toc, sections, {}, bundle_meta)
+
+    seen: dict[str, int] = {}
+    for part_file in sorted((out_dir / "synthetic-split").glob("*.json")):
+        part_bundle = json.loads(part_file.read_text())
+        for eid in part_bundle["sections"]:
+            seen[eid] = seen.get(eid, 0) + 1
+
+    assert seen == {eid: 1 for eid in source_section_eids}
+
+
 def test_collect_section_eids_recurses_into_divisions():
     toc_node = {
         "eid": "part-I",
