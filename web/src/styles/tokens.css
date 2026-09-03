@@ -19,6 +19,10 @@
   --color-accent-bg: oklch(94% 0.06 80);
   --color-accent-border: oklch(68% 0.14 80);
 
+  /* Cross-reference links — blue, dark enough for WCAG AA body text
+     (6.5:1 on surface, 5.6:1 on the shaded example box). */
+  --color-link: oklch(48% 0.15 250);
+
   /* Label chips — semantic traffic-light only */
   --chip-grounded-bg:     oklch(90% 0.05 155);
   --chip-grounded-text:   oklch(32% 0.12 155);

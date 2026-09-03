@@ -99,7 +99,7 @@ function onMouseLeave() {
 /* Cross-references: resolved refs are links; unresolved refs render as
    plain text -- no underline, default cursor. */
 .section-html :deep(.akn-ref) {
-  color: var(--color-accent-border);
+  color: var(--color-link);
   text-decoration: underline;
   text-underline-offset: 2px;
   cursor: pointer;
@@ -115,7 +115,7 @@ function onMouseLeave() {
    begin "Note:" / "Note 1:", so ::before would double it. */
 .section-html :deep(.akn-notetext) {
   font-size: 0.8125rem;
-  color: var(--color-ink-3);
+  color: var(--color-ink-2);
   margin: var(--s-2) 0 var(--s-2) var(--s-4);
 }
 .section-html :deep(.akn-note-label) {
