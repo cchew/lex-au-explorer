@@ -45,9 +45,26 @@ def _local_tag(el: ET._Element) -> str:
 
 def build_toc(root: ET._Element) -> list[dict]:
     body = root.find(f".//{AKN}body")
-    if body is None:
-        return []
-    return [_toc_node(child) for child in body if _local_tag(child) in _STRUCTURAL_TAGS]
+    out: list[dict] = (
+        [] if body is None
+        else [_toc_node(child) for child in body if _local_tag(child) in _STRUCTURAL_TAGS]
+    )
+    for sched in root.iterfind(
+        f".//{AKN}attachments/{AKN}attachment/{AKN}hcontainer[@name='schedule']"
+    ):
+        clauses = [
+            {"eid": c.get("eId", ""), "heading": _entry_heading(c), "children": []}
+            for c in sched.iterfind(f"{AKN}hcontainer[@name='clause']")
+        ]
+        out.append(
+            {
+                # Task 5 adds a proper "Schedule N" label; heading-text-only for now.
+                "eid": sched.get("eId", ""),
+                "heading": _entry_heading(sched),
+                "children": clauses,
+            }
+        )
+    return out
 
 
 def _toc_node(el: ET._Element) -> dict:
@@ -58,6 +75,30 @@ def _toc_node(el: ET._Element) -> dict:
     heading = f"{num_text} {heading_text}".strip()
     children = [_toc_node(c) for c in el if _local_tag(c) in _STRUCTURAL_TAGS]
     return {"eid": el.get("eId", ""), "heading": heading, "children": children}
+
+
+def _entry_heading(el: ET._Element) -> str:
+    """``<heading>`` text only. Task 5 prepends the clause's ``<num>``."""
+    heading_el = el.find(f"{AKN}heading")
+    return (heading_el.text or "").strip() if heading_el is not None else ""
+
+
+def _add_entry(
+    sections: dict[str, dict],
+    eid: str,
+    heading: str,
+    html: str,
+    counts: "collections.Counter[str]",
+) -> str:
+    """Record one bundle entry under ``eid``.
+
+    ``counts`` is unused here -- it is threaded through now so every call site
+    already passes it. Task 4 makes collisions (schedule paragraph eIds repeat
+    within a clause, see the parity spike) safe and starts recording
+    disambiguation events into ``counts``.
+    """
+    sections[eid] = {"heading": heading, "html": html}
+    return eid
 
 
 def build_sections(
@@ -102,4 +143,18 @@ def build_sections(
         eid: {"heading": heading, "html": render_section(node, active_style)}
         for eid, heading, node in parsed
     }
+
+    for sched in root.iterfind(
+        f".//{AKN}attachments/{AKN}attachment/{AKN}hcontainer[@name='schedule']"
+    ):
+        for clause in sched.iterfind(f"{AKN}hcontainer[@name='clause']"):
+            eid = clause.get("eId", "")
+            if not eid:
+                continue
+            node = parse_section(clause, ref_index)
+            heading = _entry_heading(clause)  # Task 5 will refine
+            _add_entry(
+                sections, eid, heading, render_section(node, active_style), ref_index.tally
+            )
+
     return sections, ref_index.tally

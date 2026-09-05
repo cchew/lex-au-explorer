@@ -126,6 +126,24 @@ def test_build_sections_defaults_to_html_style_map() -> None:
     assert '<table class="akn-table">' in sections[eid]["html"]
 
 
+# --------------------------------------------------------------------------- #
+# Schedule clauses -- Task 2: schedule and figure rendering
+# --------------------------------------------------------------------------- #
+
+
+def test_schedule_clause_reaches_bundle_and_toc() -> None:
+    root = _parse_corpus("sched-clause.xml")
+    idx = build_ref_index(_all_nav_eids(root))
+    sections, _ = build_sections(root, idx)
+    assert any(k.startswith("schedule-1__clause-") for k in sections)
+
+    toc = build_toc(root)
+    sched = [n for n in toc if n["eid"].startswith("schedule-")]
+    assert sched and any(
+        c["eid"].startswith("schedule-1__clause-") for c in sched[0]["children"]
+    )
+
+
 def test_build_sections_skips_sections_without_an_eid() -> None:
     root = ET.fromstring(
         f'<akomaNtoso xmlns="{AKN[1:-1]}"><act><body>'
