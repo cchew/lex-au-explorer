@@ -99,7 +99,7 @@ def test_build_sections_preserves_heading_from_heading_element() -> None:
     sections, _ = build_sections(root, ix)
     assert (
         sections["chapter-1__part-1.1__sec-3"]["heading"]
-        == "Constitutional basis for this Act"
+        == "3 Constitutional basis for this Act"
     )
 
 
@@ -310,6 +310,75 @@ def test_schedule_unit_count_equals_bundle_key_count() -> None:
                 ]
             )
             assert n_units == n_keys, f"{fixture}: {n_units} units vs {n_keys} keys"
+
+
+# --------------------------------------------------------------------------- #
+# Schedule labels + clause/section numbers in headings -- Task 5
+# --------------------------------------------------------------------------- #
+
+
+def test_schedule_label_from_ordinal() -> None:
+    """sched-multi.xml has 2 schedules, neither heading starting with
+    "Schedule" -- both must get a synthesised "Schedule N -- <heading>" label,
+    numbered by position among the document's schedules."""
+    root = _parse_corpus("sched-multi.xml")
+    toc = build_toc(root)
+    labels = [n["heading"] for n in toc if n["eid"].startswith("schedule-")]
+    assert len(labels) == 2
+    assert labels[0].startswith("Schedule 1") and " — " in labels[0]
+    assert labels[0] == "Schedule 1 — Family tax benefit rate calculator"
+    assert labels[1] == (
+        "Schedule 2 — Amounts of child care subsidy and "
+        "additional child care subsidy"
+    )
+
+
+def test_schedule_label_verbatim_when_heading_already_says_schedule() -> None:
+    """A schedule whose <heading> already reads "Schedule N" (gazette form)
+    must be used verbatim -- not re-numbered or have an ordinal appended."""
+    root = ET.fromstring(
+        f'<akomaNtoso xmlns="{AKN[1:-1]}"><act><attachments><attachment>'
+        f'<hcontainer name="schedule" eId="schedule-1">'
+        f"<heading>Schedule 7</heading>"
+        f"<content><p>body</p></content></hcontainer>"
+        f"</attachment></attachments></act></akomaNtoso>"
+    )
+    toc = build_toc(root)
+    assert toc[0]["heading"] == "Schedule 7"
+
+
+def test_clause_heading_carries_num() -> None:
+    root = _parse_corpus("sched-clause.xml")
+    sections, _ = build_sections(root, build_ref_index(_all_nav_eids(root)))
+    k = next(k for k in sections if k.startswith("schedule-1__clause-"))
+    # sched-clause.xml's real clause is <num>70-20</num>.
+    assert sections[k]["heading"].split()[0] == "70-20"
+    assert sections[k]["heading"] == (
+        "70-20 Audit of administration books—on order of the Court"
+    )
+
+
+def test_body_section_heading_regains_num() -> None:
+    root = _parse_corpus("corp-act-s3.xml")
+    sections, _ = build_sections(root, build_ref_index(_all_nav_eids(root)))
+    assert (
+        sections["chapter-1__part-1.1__sec-3"]["heading"]
+        == "3 Constitutional basis for this Act"
+    )
+
+
+def test_numbered_heading_does_not_double_a_heading_that_already_has_the_num() -> None:
+    """If <heading> text already begins with the <num> text, the num must not
+    be prepended a second time."""
+    root = ET.fromstring(
+        f'<akomaNtoso xmlns="{AKN[1:-1]}"><act><body>'
+        f'<section eId="s1"><num>3</num>'
+        f"<heading>3 Already numbered</heading>"
+        f"<content><p>body</p></content></section>"
+        f"</body></act></akomaNtoso>"
+    )
+    sections, _ = build_sections(root, build_ref_index([]))
+    assert sections["s1"]["heading"] == "3 Already numbered"
 
 
 def test_build_sections_skips_sections_without_an_eid() -> None:

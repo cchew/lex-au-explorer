@@ -147,14 +147,14 @@ def build_toc(root: ET._Element) -> list[dict]:
                 _, raw_key, _run = unit
                 key = _next_free_key(raw_key, lambda k: k in used)
                 used.add(key)
-                # Synthetic (loose-prose) units have no <heading> of their
-                # own; Task 5 adds a proper label.
+                # Synthetic (loose-prose) units have no <num>/<heading> of
+                # their own; they stay unlabelled (Task 5 numbers clauses
+                # and body sections only, not these).
                 children.append({"eid": key, "heading": "", "children": []})
         out.append(
             {
-                # Task 5 adds a proper "Schedule N" label; heading-text-only for now.
                 "eid": sched.get("eId", ""),
-                "heading": _entry_heading(sched),
+                "heading": _schedule_label(sched),
                 "children": children,
             }
         )
@@ -171,10 +171,71 @@ def _toc_node(el: ET._Element) -> dict:
     return {"eid": el.get("eId", ""), "heading": heading, "children": children}
 
 
-def _entry_heading(el: ET._Element) -> str:
-    """``<heading>`` text only. Task 5 prepends the clause's ``<num>``."""
+def _numbered_heading(el: ET._Element) -> str:
+    """``f"{num} {heading}".strip()``, mirroring :func:`_toc_node` (Task 5).
+
+    Used for both schedule clauses (``_entry_heading``) and regular body
+    ``<section>`` elements (``build_sections``'s first loop), so the two
+    never diverge on how a number gets prepended to a heading.
+
+    Guard: if ``heading`` text already starts with the ``num`` text, the
+    heading is returned unprepended -- a source document that has already
+    baked its number into the heading (e.g. ``<heading>3 Already
+    numbered</heading>``) must not get a doubled ``"3 3 Already
+    numbered"``. An empty ``num_text`` never matches this guard's intent
+    (every string "starts with" ""), so it's excluded explicitly to avoid
+    short-circuiting into always-true.
+    """
     heading_el = el.find(f"{AKN}heading")
-    return (heading_el.text or "").strip() if heading_el is not None else ""
+    num_el = el.find(f"{AKN}num")
+    heading_text = (heading_el.text or "").strip() if heading_el is not None else ""
+    num_text = (num_el.text or "").strip() if num_el is not None else ""
+    if not num_text or heading_text.startswith(num_text):
+        return heading_text
+    return f"{num_text} {heading_text}".strip()
+
+
+def _entry_heading(el: ET._Element) -> str:
+    """Numbered ``<heading>`` text for a schedule clause -- see
+    :func:`_numbered_heading`."""
+    return _numbered_heading(el)
+
+
+def _schedule_label(sched: ET._Element) -> str:
+    """The TOC/bundle label for one ``<hcontainer name="schedule">`` (Task 5).
+
+    If the schedule's own ``<heading>`` already reads in gazette form (starts
+    with the literal word "Schedule", e.g. "Schedule 2") it is returned
+    verbatim. Otherwise a synthesised ``"Schedule {ordinal}"`` label is used,
+    with `` — {heading}`` appended when a heading exists.
+
+    ``ordinal`` is the schedule's 1-based position among *all* schedules in
+    the document (every ``hcontainer[@name='schedule']`` reachable via
+    ``.//attachments/attachment/hcontainer[@name='schedule']``, the same
+    xpath ``build_toc``/``build_sections`` already iterate) -- verified
+    against the full lex-au corpus (3,076 Acts): every Act has exactly one
+    ``<attachments>`` element, every ``<attachment>`` wraps exactly one
+    schedule, and no schedule nests another, so this xpath's document-order
+    walk *is* the full and only sibling scope; there is no narrower
+    per-``<attachment>`` grouping to consider. This ordinal is the corpus's
+    own numbering, which can differ from the Act's gazetted schedule number
+    for a small number of Acts (see README "Known limitations").
+    """
+    heading_el = sched.find(f"{AKN}heading")
+    heading_text = (heading_el.text or "").strip() if heading_el is not None else ""
+    if heading_text.startswith("Schedule"):
+        return heading_text
+    root = sched.getroottree().getroot()
+    schedules = list(
+        root.iterfind(
+            f".//{AKN}attachments/{AKN}attachment/{AKN}hcontainer[@name='schedule']"
+        )
+    )
+    ordinal = schedules.index(sched) + 1
+    label = f"Schedule {ordinal}"
+    if heading_text:
+        label += f" — {heading_text}"
+    return label
 
 
 def _next_free_key(eid: str, taken: Callable[[str], bool]) -> str:
@@ -244,8 +305,9 @@ def build_sections(
     """Parse then render every ``<section>`` under ``root``.
 
     Returns ``({eid: {"heading", "html"}}, ref_index.tally)``. ``heading`` is
-    still the ``<heading>`` element's text. ``style`` defaults to
-    :class:`~build.stylemap.HtmlStyleMap`. There is no ``resolver`` /
+    the section's ``<num>`` prepended to its ``<heading>`` text (Task 5's
+    :func:`_numbered_heading`, guarded against double-numbering). ``style``
+    defaults to :class:`~build.stylemap.HtmlStyleMap`. There is no ``resolver`` /
     ``act_frbr_uri`` parameter -- cross-reference resolution is entirely
     ``ref_index``'s job (Stage 1 calls ``ref_index.resolve``).
 
@@ -265,8 +327,7 @@ def build_sections(
         eid = section.get("eId", "")
         if not eid:
             continue
-        heading_el = section.find(f"{AKN}heading")
-        heading = (heading_el.text or "").strip() if heading_el is not None else ""
+        heading = _numbered_heading(section)
         parsed.append((eid, heading, parse_section(section, ref_index)))
 
     if on_parsed is not None:
@@ -287,7 +348,7 @@ def build_sections(
                 if not eid:
                     continue
                 node = parse_section(clause, ref_index)
-                heading = _entry_heading(clause)  # Task 5 will refine
+                heading = _entry_heading(clause)
                 # The returned key (== eid unless _add_entry disambiguated a
                 # collision) is captured, not just discarded, per Task 4: it
                 # is the actual key this unit landed under in `sections`.
@@ -309,8 +370,9 @@ def build_sections(
                 for el in run:
                     wrap.append(copy.deepcopy(el))
                 node = parse_section(wrap, ref_index)
-                # Synthetic units have no <heading> of their own; Task 5
-                # refines schedule-unit labelling.
+                # Synthetic (loose-prose) units have no <num>/<heading> of
+                # their own -- Task 5's numbered-heading composition does not
+                # apply to them; they stay unlabelled.
                 _key = _add_entry(
                     sections, key, "", render_section(node, active_style), ref_index.tally
                 )

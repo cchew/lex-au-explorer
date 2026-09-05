@@ -1,0 +1,53 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<akomaNtoso xmlns="http://docs.oasis-open.org/legaldocml/ns/akn/3.0">
+  <act name="act">
+    <meta>
+      <!-- Trimmed real-corpus fixture (lex-au-explorer Task 5). Source: lex-au/repo/corpus/xml/a-new-tax-system-(family-assistance)-act-1999.xml. Kept: full identification block. Body dropped (this fixture only exercises build_toc's schedule label logic, which never reads body). Attachments trimmed to the Act's first two of four schedules, each reduced to its heading and opening content note; neither heading starts with the word "Schedule", the case this fixture targets. -->
+      <identification source="#lex-au">
+        <FRBRWork>
+          <FRBRthis value="/akn/au/act/1999/80/!main"/>
+          <FRBRuri value="/akn/au/act/1999/80"/>
+          <FRBRdate date="1999-01-01" name="Generation"/>
+          <FRBRauthor href="#parliament"/>
+          <FRBRcountry value="au"/>
+          <FRBRsubtype value="act"/>
+          <FRBRnumber value="80"/>
+          <FRBRname value="a-new-tax-system-(family-assistance)-act-1999"/>
+          <FRBRprescriptive value="true"/>
+          <FRBRauthoritative value="true"/>
+        </FRBRWork>
+        <FRBRExpression>
+          <FRBRthis value="/akn/au/act/1999/80/eng@2026-07-01/!main"/>
+          <FRBRuri value="/akn/au/act/1999/80/eng@2026-07-01"/>
+          <FRBRdate date="2026-07-01" name="Generation"/>
+          <FRBRauthor href="#parliament"/>
+          <FRBRlanguage language="eng"/>
+        </FRBRExpression>
+        <FRBRManifestation>
+          <FRBRthis value="/akn/au/act/1999/80/eng@2026-07-01/!main.akn"/>
+          <FRBRuri value="/akn/au/act/1999/80/eng@2026-07-01/!main.akn"/>
+          <FRBRdate date="2026-08-17" name="Generation"/>
+          <FRBRauthor href="#lex-au"/>
+        </FRBRManifestation>
+      </identification>
+    </meta>
+    <attachments>
+      <attachment>
+        <hcontainer name="schedule" eId="schedule-1">
+          <heading>Family tax benefit rate calculator</heading>
+          <content>
+            <p>Note:	See subsection 58(1).</p>
+          </content>
+        </hcontainer>
+      </attachment>
+      <attachment>
+        <hcontainer name="schedule" eId="schedule-2">
+          <heading>Amounts of child care subsidy and additional child care subsidy</heading>
+          <content>
+            <p>Note:	See <ref href="#dvs-6">Division 6</ref> of <ref href="#part-4A">Part 4A</ref>.</p>
+          </content>
+        </hcontainer>
+      </attachment>
+    </attachments>
+  </act>
+</akomaNtoso>

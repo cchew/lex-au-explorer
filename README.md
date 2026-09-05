@@ -53,5 +53,14 @@ Known limitation: repeal is only detected for Acts that also had a compilation
 change; a repealed Act with no final compilation still reads as current until
 the next corpus re-ingest drops it.
 
+## Known limitations
+
+Schedule labels ("Schedule N") number schedules by their position in the
+corpus XML, not by the Act's gazetted schedule number. These agree for
+almost every Act; a small number of Acts number their gazetted schedules
+non-sequentially or omit one, so the corpus ordinal can drift from the
+gazette. Fixing this needs a lex-au-side follow-up (carrying the gazetted
+number through the corpus rather than deriving it at build time).
+
 ## License
 MIT
