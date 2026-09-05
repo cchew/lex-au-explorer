@@ -193,7 +193,20 @@ async function selectSection(eid: string) {
   // path below: a split_schedules Act has `split_by_part === false`, so the
   // old `!split_by_part` early-out would activate the Schedule eid with no
   // sections behind it and render a blank pane.
-  if (!(eid in b.sections) && (b.split_by_part || b.split_schedules)) {
+  //
+  // The `split_schedules` disjunct is gated on `targetGroup` being an actual
+  // promoted schedule group (the frontend mirror of the build's
+  // `_is_schedule_key`: `k.split("__")[0].startswith("schedule-")`). A
+  // split_schedules Act keeps its whole body inline, so a click on a bare
+  // body container eid (`part-1`, `part-1__dvs-2`) is NOT in `sections` yet
+  // must not trigger `loadPart("/data/<slug>/part-1.json")` -- that file does
+  // not exist, the fetch 404s, and `loadPart` nulls `bundle.value`, ejecting
+  // the reader. Those container clicks fall through to path (a), where
+  // `scrollToSection` resolves the container to its first descendant leaf.
+  if (
+    !(eid in b.sections) &&
+    (b.split_by_part || (b.split_schedules && targetGroup.startsWith("schedule-")))
+  ) {
     if (!loadedGroups.value.has(targetGroup) && currentSlug.value) {
       await loadPart(currentSlug.value, targetGroup);
     }

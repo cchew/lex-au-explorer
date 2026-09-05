@@ -506,8 +506,12 @@ describe("ReaderView", () => {
   it("fetches a schedule file for a split_schedules Act, merges, and doesn't re-fetch", async () => {
     const fetchMock = vi.fn(async (url: string) => {
       if (url.includes("index.json")) return jsonResponse(MOCK_SPLIT_SCHEDULES_INDEX);
+      if (url.endsWith("/corporations-act-2001.json")) return jsonResponse(MOCK_SPLIT_SCHEDULES_BUNDLE);
       if (url.includes("/corporations-act-2001/schedule-1.json")) return jsonResponse(MOCK_SCHEDULE_PART_FILE);
-      return jsonResponse(MOCK_SPLIT_SCHEDULES_BUNDLE);
+      // Any other /data/<slug>/*.json path does not exist: production serves the
+      // SPA HTML shell, which fetchJson classifies as HTTP 404. An over-eager
+      // loadPart (e.g. loadPart("part-1")) must fail loudly, not silently merge.
+      return htmlResponse();
     });
     vi.stubGlobal("fetch", fetchMock);
 
@@ -560,5 +564,70 @@ describe("ReaderView", () => {
     await wrapper.vm.$nextTick();
 
     expect(scheduleFetches()).toBe(1);
+  });
+
+  it("does not fetch (or eject) on a body container click for a split_schedules Act", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes("index.json")) return jsonResponse(MOCK_SPLIT_SCHEDULES_INDEX);
+      if (url.endsWith("/corporations-act-2001.json")) return jsonResponse(MOCK_SPLIT_SCHEDULES_BUNDLE);
+      if (url.includes("/corporations-act-2001/schedule-1.json")) return jsonResponse(MOCK_SCHEDULE_PART_FILE);
+      // No per-Part file exists for a split_schedules Act (body is inline);
+      // production serves the SPA shell -> fetchJson throws HTTP 404.
+      return htmlResponse();
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const partFetches = () =>
+      fetchMock.mock.calls.filter((c) => String(c[0]).includes("/corporations-act-2001/part-1.json")).length;
+    const scheduleFetches = () =>
+      fetchMock.mock.calls.filter((c) => String(c[0]).includes("/corporations-act-2001/schedule-1.json")).length;
+
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: "/reader", component: ReaderView }],
+    });
+    router.push("/reader");
+    await router.isReady();
+
+    const wrapper = mount(ReaderView, { global: { plugins: [router] } });
+    await new Promise((r) => setTimeout(r, 10));
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+
+    await wrapper.find(".shortcut-btn").trigger("click");
+    await new Promise((r) => setTimeout(r, 10));
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+
+    const vm = wrapper.vm as unknown as ReaderVm & { activeTopLevelEid: string | null };
+
+    // Click the bare body container eid (a Part heading / resolved whole-Part
+    // xref). "part-1" is a TOC branch node, so ActToc emits select("part-1").
+    const partBranch = wrapper.findAll(".toc-branch").find((b) => b.text() === "Part 1");
+    expect(partBranch).toBeTruthy();
+    await partBranch!.trigger("click");
+    await new Promise((r) => setTimeout(r, 10));
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+
+    // No spurious per-Part fetch, reader still mounted, group activated.
+    expect(partFetches()).toBe(0);
+    expect(vm.bundle).not.toBeNull();
+    expect(vm.activeTopLevelEid).toBe("part-1");
+    expect(wrapper.find(".load-error").exists()).toBe(false);
+    expect(wrapper.text()).toContain("Body provision");
+
+    // The real schedule path still works from the same bundle.
+    const clauseLeaf = wrapper.findAll(".toc-leaf").find((b) => b.text() === "Amendments");
+    expect(clauseLeaf).toBeTruthy();
+    await clauseLeaf!.trigger("click");
+    await new Promise((r) => setTimeout(r, 10));
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+
+    expect(scheduleFetches()).toBe(1);
+    expect(vm.bundle?.sections["schedule-1__clause-1"]).toBeDefined();
+    expect(wrapper.text()).toContain("Schedule clause body");
   });
 });
