@@ -16,7 +16,10 @@ const activeSection = ref<string | null>(null);
 const activeTopLevelEid = ref<string | null>(null);
 const error = ref<string | null>(null);
 const currentSlug = ref<string | null>(null);
-const loadedPartEid = ref<string | null>(null);
+// Top-level TOC groups (Parts, or Schedules for split_schedules Acts) whose
+// section maps have already been fetched and merged into `bundle.value`.
+// Revisiting any group in this set must be a genuine no-op -- no re-fetch.
+const loadedGroups = ref<Set<string>>(new Set());
 
 // Fetch + parse a JSON bundle, distinguishing "not found" from "malformed."
 //
@@ -51,7 +54,7 @@ async function selectAct(slug: string, source: OpenSource = "direct") {
   activeSection.value = null;
   activeTopLevelEid.value = null;
   currentSlug.value = slug;
-  loadedPartEid.value = null;
+  loadedGroups.value = new Set();
   try {
     const data = await fetchJson<ActBundle>(`/data/${slug}.json`);
     bundle.value = data;
@@ -72,9 +75,20 @@ async function loadPart(slug: string, partEid: string) {
   try {
     const partData = await fetchJson<ActBundle>(`/data/${slug}/${partEid}.json`);
     if (bundle.value) {
-      bundle.value = { ...bundle.value, sections: partData.sections, definitions: partData.definitions };
+      // Merge, don't replace: a split_by_part Act accumulates Parts as the
+      // reader navigates between them, and a split_schedules Act keeps its
+      // inline body sections when a Schedule file is pulled in. `visibleSections`
+      // still filters to the active top node, so held-but-inactive entries are
+      // never mis-rendered. Schedule part files carry only `sections` (no
+      // `definitions`); `...undefined` spreads to nothing, so the merge is safe.
+      bundle.value = {
+        ...bundle.value,
+        sections: { ...bundle.value.sections, ...partData.sections },
+        definitions: { ...bundle.value.definitions, ...partData.definitions },
+      };
     }
-    loadedPartEid.value = partEid;
+    // Reassign (not a bare `.add`) so Vue reactivity fires on the ref.
+    loadedGroups.value = new Set(loadedGroups.value).add(partEid);
     activeTopLevelEid.value = partEid;
   } catch (e) {
     error.value = e instanceof Error ? e.message : "Failed to load Act";
@@ -168,21 +182,32 @@ async function scrollToSection(eid: string) {
 async function selectSection(eid: string) {
   activeSection.value = eid;
   track("toc_navigate", { slug: currentSlug.value, position: sectionPosition(eid) });
+  const b = bundle.value;
+  if (!b) return;
   const targetGroup = ownerPartEid(eid);
-  if (!bundle.value?.split_by_part) {
+
+  // (b) The target provision is not in the loaded section map, and this Act
+  // splits its content across separate files (`split_by_part` for Parts,
+  // `split_schedules` for Schedules). Fetch the owning group's file if it
+  // hasn't been loaded, then activate it. This MUST precede the plain-Act
+  // path below: a split_schedules Act has `split_by_part === false`, so the
+  // old `!split_by_part` early-out would activate the Schedule eid with no
+  // sections behind it and render a blank pane.
+  if (!(eid in b.sections) && (b.split_by_part || b.split_schedules)) {
+    if (!loadedGroups.value.has(targetGroup) && currentSlug.value) {
+      await loadPart(currentSlug.value, targetGroup);
+    }
     activeTopLevelEid.value = targetGroup;
     await scrollToSection(eid);
     return;
   }
-  if (targetGroup === loadedPartEid.value) {
-    activeTopLevelEid.value = targetGroup;
-    await scrollToSection(eid);
-    return;
-  }
-  if (currentSlug.value) {
-    await loadPart(currentSlug.value, targetGroup);
-    await scrollToSection(eid);
-  }
+
+  // (a) The target is already in the section map (a small single-file Act, or
+  // an already-loaded Part/Schedule), or it is a container eid that
+  // `scrollToSection` resolves to a descendant leaf. Just switch the active
+  // group and scroll -- no fetch.
+  activeTopLevelEid.value = targetGroup;
+  await scrollToSection(eid);
 }
 
 // In-app cross-reference navigation: a click on a resolved ref link

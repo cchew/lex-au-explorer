@@ -47,6 +47,9 @@ export interface ActBundle {
   definitions: Record<string, DefinitionEntry>;
   raw_xml_url: string;
   split_by_part: boolean;
+  // Emitted by the build only when true (large Acts whose Schedules live in
+  // separate /data/<slug>/<schedule-eid>.json files); absent reads as false.
+  split_schedules?: boolean;
   verification?: VerificationInfo;
   preface?: PrefaceEntry;
 }

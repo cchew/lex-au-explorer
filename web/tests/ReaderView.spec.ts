@@ -2,7 +2,12 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import { createRouter, createMemoryHistory } from "vue-router";
 import ReaderView from "../src/views/ReaderView.vue";
+import type { ActBundle } from "../src/types";
 import { track } from "../src/lib/analytics";
+
+// ReaderView is a <script setup> component; VTU exposes its setup bindings on
+// wrapper.vm in the (dev-mode) test runtime. Narrow to what the assertions read.
+type ReaderVm = { bundle: ActBundle | null };
 
 vi.mock("../src/lib/analytics", () => ({ track: vi.fn() }));
 
@@ -58,6 +63,36 @@ const MOCK_SPLIT_PART_II_BUNDLE = {
 
 const MOCK_SPLIT_INDEX = [
   { title: "Fair Work Act 2009", slug: "fair-work-act-2009", frbr_uri: "/akn/au/act/2009/28", split_by_part: true }
+];
+
+// A large single-file Act whose Schedules were promoted to separate files
+// (Task 9's split_schedules). split_by_part is false: the Act body is inline,
+// only Schedule unit eids are missing from `sections` until fetched.
+// slug must be one of ActSearch's SHORTCUTS so the test can open it via a
+// shortcut button, like the other ReaderView tests.
+const MOCK_SPLIT_SCHEDULES_BUNDLE = {
+  frbr_uri: "/akn/au/act/2001/50", title: "Corporations Act 2001", title_id: "C1",
+  legislation_url: "https://www.legislation.gov.au/C1/latest/text",
+  comp_id: "C2", effective_date: "2026-06-04",
+  toc: [
+    { eid: "part-1", heading: "Part 1", children: [{ eid: "part-1__sec-1", heading: "Short title", children: [] }] },
+    { eid: "schedule-1", heading: "Schedule 1", children: [{ eid: "schedule-1__clause-1", heading: "Amendments", children: [] }] },
+  ],
+  sections: { "part-1__sec-1": { heading: "Short title", html: "<p>Body provision</p>" } },
+  definitions: {},
+  raw_xml_url: "/data/corporations-act-2001.xml",
+  split_by_part: false,
+  split_schedules: true,
+};
+
+// Schedule part file shape: `sections` only, no other bundle keys (matches
+// Task 9's _write_schedule_file).
+const MOCK_SCHEDULE_PART_FILE = {
+  sections: { "schedule-1__clause-1": { heading: "Amendments", html: "<p>Schedule clause body</p>" } },
+};
+
+const MOCK_SPLIT_SCHEDULES_INDEX = [
+  { title: "Corporations Act 2001", slug: "corporations-act-2001", frbr_uri: "/akn/au/act/2001/50", split_by_part: false }
 ];
 
 // Real fetch Responses expose Content-Type via `.headers.get(...)` and a
@@ -419,5 +454,111 @@ describe("ReaderView", () => {
     expect(call).toBeDefined();
     expect(call![1]).toEqual({ slug: "privacy-act-1988", position: expect.any(String) });
     expect(call![1]).not.toHaveProperty("eid");
+  });
+
+  it("merges part sections instead of replacing when navigating between Parts", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url.includes("index.json")) return jsonResponse(MOCK_SPLIT_INDEX);
+      if (url.includes("/fair-work-act-2009/part-I.json")) return jsonResponse(MOCK_SPLIT_PART_BUNDLE);
+      if (url.includes("/fair-work-act-2009/part-II.json")) return jsonResponse(MOCK_SPLIT_PART_II_BUNDLE);
+      return jsonResponse(MOCK_SPLIT_INDEX_BUNDLE_TWO_PARTS);
+    }));
+
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: "/reader", component: ReaderView }],
+    });
+    router.push("/reader");
+    await router.isReady();
+
+    const wrapper = mount(ReaderView, { global: { plugins: [router] } });
+    await new Promise((r) => setTimeout(r, 10));
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+
+    await wrapper.find(".shortcut-btn").trigger("click");
+    await new Promise((r) => setTimeout(r, 10));
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+    await new Promise((r) => setTimeout(r, 10));
+    await wrapper.vm.$nextTick();
+
+    // Part I is loaded on open.
+    const vm = wrapper.vm as unknown as ReaderVm;
+    expect(vm.bundle?.sections["part-I__sec-6"]).toBeDefined();
+
+    // Navigate to a Part II leaf.
+    const partIILeaf = wrapper.findAll(".toc-leaf").find((b) => b.text() === "Enforcement");
+    expect(partIILeaf).toBeTruthy();
+    await partIILeaf!.trigger("click");
+    await new Promise((r) => setTimeout(r, 10));
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+
+    // Both Parts' sections are present -- the old replace behaviour dropped Part I.
+    expect(vm.bundle?.sections["part-I__sec-6"]).toBeDefined();
+    expect(vm.bundle?.sections["part-II__sec-10"]).toBeDefined();
+    expect(wrapper.text()).toContain("Part II content");
+    expect(wrapper.find(".load-error").exists()).toBe(false);
+  });
+
+  it("fetches a schedule file for a split_schedules Act, merges, and doesn't re-fetch", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes("index.json")) return jsonResponse(MOCK_SPLIT_SCHEDULES_INDEX);
+      if (url.includes("/corporations-act-2001/schedule-1.json")) return jsonResponse(MOCK_SCHEDULE_PART_FILE);
+      return jsonResponse(MOCK_SPLIT_SCHEDULES_BUNDLE);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const scheduleFetches = () =>
+      fetchMock.mock.calls.filter((c) => String(c[0]).includes("/corporations-act-2001/schedule-1.json")).length;
+
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: "/reader", component: ReaderView }],
+    });
+    router.push("/reader");
+    await router.isReady();
+
+    const wrapper = mount(ReaderView, { global: { plugins: [router] } });
+    await new Promise((r) => setTimeout(r, 10));
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+
+    await wrapper.find(".shortcut-btn").trigger("click");
+    await new Promise((r) => setTimeout(r, 10));
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+
+    // Body provision renders; the schedule file has not been touched.
+    expect(wrapper.text()).toContain("Body provision");
+    expect(scheduleFetches()).toBe(0);
+
+    const vm = wrapper.vm as unknown as ReaderVm;
+    expect(vm.bundle?.sections["schedule-1__clause-1"]).toBeUndefined();
+
+    // Click the schedule clause -> exactly one fetch of the schedule file.
+    const clauseLeaf = wrapper.findAll(".toc-leaf").find((b) => b.text() === "Amendments");
+    expect(clauseLeaf).toBeTruthy();
+    await clauseLeaf!.trigger("click");
+    await new Promise((r) => setTimeout(r, 10));
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+
+    expect(scheduleFetches()).toBe(1);
+    expect(vm.bundle?.sections["schedule-1__clause-1"]).toBeDefined();
+    expect(vm.bundle?.sections["part-1__sec-1"]).toBeDefined(); // body kept
+    expect(wrapper.text()).toContain("Schedule clause body");
+    expect(wrapper.find(".load-error").exists()).toBe(false);
+
+    // Click it again -> genuine no-op, no additional fetch.
+    await clauseLeaf!.trigger("click");
+    await new Promise((r) => setTimeout(r, 10));
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+
+    expect(scheduleFetches()).toBe(1);
   });
 });
