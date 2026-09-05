@@ -480,6 +480,49 @@ def test_make_on_parsed_flips_figure_asset_and_emits_real_img(tmp_path):
     assert "akn-figure-missing" not in html
 
 
+def test_collect_section_eids_keeps_schedule_clauses():
+    node = {"eid": "schedule-1", "children": [
+        {"eid": "schedule-1__clause-2", "children": []},
+        {"eid": "schedule-1__clause-2__subclause-1", "children": []}]}
+    assert _collect_section_eids(node) == {
+        "schedule-1", "schedule-1__clause-2", "schedule-1__clause-2__subclause-1"}
+
+
+def test_split_by_part_act_writes_schedule_file(tmp_path, monkeypatch):
+    monkeypatch.setattr("build.metadata._SPLIT_BY_PART_THRESHOLD_BYTES", 200)
+    out_dir = tmp_path / "data"
+    build_site(
+        corpus_index=FIXTURES / "split-sched-corpus-index.json",
+        xml_dir=FIXTURES / "xml",
+        graph_path=None,
+        out_dir=out_dir,
+    )
+
+    sched = json.loads((out_dir / "split-sched-act" / "schedule-1.json").read_text())
+    assert "schedule-1__clause-1" in sched["sections"]
+    assert "definitions" not in sched
+
+    thin = json.loads((out_dir / "split-sched-act.json").read_text())
+    assert thin["sections"] == {}
+
+
+def test_schedule_heavy_non_part_act_promoted(tmp_path, monkeypatch):
+    monkeypatch.setattr("build.cli._SCHEDULE_SPLIT_BYTES", 200)
+    out_dir = tmp_path / "data"
+    build_site(
+        corpus_index=FIXTURES / "split-sched-corpus-index.json",
+        xml_dir=FIXTURES / "xml",
+        graph_path=None,
+        out_dir=out_dir,
+    )
+
+    idx = json.loads((out_dir / "split-sched-act.json").read_text())
+    assert idx["split_schedules"] is True
+    assert idx["sections"]  # body sections still inline
+    assert not any(k.startswith("schedule-") for k in idx["sections"])
+    assert (out_dir / "split-sched-act" / "schedule-1.json").exists()
+
+
 def test_collect_section_eids_recurses_into_divisions():
     toc_node = {
         "eid": "part-I",

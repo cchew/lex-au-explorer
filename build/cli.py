@@ -30,6 +30,18 @@ _NAV_HCONTAINER_NAMES: frozenset[str] = frozenset({"clause", "subclause"})
 
 _TALLY_KEYS: tuple[str, ...] = ("resolved", "ambiguous", "unresolved")
 
+# Non-part-split Act whose schedule HTML exceeds this is promoted to
+# ``split_schedules`` mode: body stays inline in ``<slug>.json``, every
+# schedule is written out as ``<slug>/<schedule_eid>.json`` (Task 9).
+_SCHEDULE_SPLIT_BYTES = 512 * 1024  # per-Act schedule html budget
+
+# ``_collect_section_eids`` keeps a TOC eId whose last ``__``-separated segment
+# starts with any of these (body sections plus the schedule clause / subclause
+# / between-clause block units from Task 3).
+_KEEP_LAST_SEGMENT_PREFIXES: tuple[str, ...] = (
+    "sec-", "clause-", "subclause-", "block-",
+)
+
 app = typer.Typer()
 
 
@@ -168,8 +180,25 @@ def build_site(
         if preface:
             bundle["preface"] = preface
 
+        schedule_html_bytes = sum(
+            len(v["html"]) for k, v in sections.items() if _is_schedule_key(k)
+        )
         if meta.split_by_part:
             _write_split_bundle(out_dir, meta.slug, toc, sections, definitions, bundle)
+        elif schedule_html_bytes > _SCHEDULE_SPLIT_BYTES:
+            # Promote: body sections stay inline in <slug>.json, every schedule
+            # is written out as <slug>/<schedule_eid>.json (Task 9).
+            body_bundle = dict(bundle)
+            body_bundle["sections"] = {
+                k: v for k, v in sections.items() if not _is_schedule_key(k)
+            }
+            body_bundle["split_schedules"] = True
+            (out_dir / f"{meta.slug}.json").write_text(json.dumps(body_bundle))
+            sched_dir = out_dir / meta.slug
+            sched_dir.mkdir(parents=True, exist_ok=True)
+            for node in toc:
+                if node["eid"].startswith("schedule-"):
+                    _write_schedule_parts(sched_dir, node, sections)
         else:
             (out_dir / f"{meta.slug}.json").write_text(json.dumps(bundle))
 
@@ -254,6 +283,14 @@ def _write_split_bundle(
     part_dir.mkdir(parents=True, exist_ok=True)
     part_section_eids: dict[str, set[str]] = {}
     for part in toc:
+        if part["eid"].startswith("schedule-"):
+            # Schedule TOC nodes are handled ONLY here. The explicit
+            # ``continue`` is load-bearing: without it the Part path below
+            # also runs _collect_section_eids on the schedule node and writes
+            # a same-named ``<schedule_eid>.json`` (last-write-wins, a latent
+            # divergence bug).
+            _write_schedule_parts(part_dir, part, sections)
+            continue
         # A split Act can carry two top-level TOC nodes with the same eId
         # (Corp Act has two ``chapter-7``; ITAA-97 repeats ``chapter-2`` /
         # ``chapter-3``). Merge their section eIds instead of letting the
@@ -277,11 +314,38 @@ def _write_split_bundle(
     (out_dir / f"{slug}.json").write_text(json.dumps(index_bundle))
 
 
+def _is_schedule_key(k: str) -> bool:
+    """A ``sections`` key belonging to a schedule: the bare synthetic
+    whole-schedule unit (``schedule-1``), a schedule clause / block
+    (``schedule-1__clause-30``, ``schedule-1__block-0``), or a disambiguated
+    variant (``schedule-1__clause-30~2``). Body eIds are ``sec-`` / ``part-`` /
+    ``chapter-`` / ``division-`` prefixed and never match."""
+    return k.split("__")[0].startswith("schedule-")
+
+
 def _collect_section_eids(toc_node: dict) -> set[str]:
-    eids = {toc_node["eid"]} if toc_node["eid"].split("__")[-1].startswith("sec-") else set()
+    eid = toc_node["eid"]
+    keep = eid.split("__")[-1].startswith(_KEEP_LAST_SEGMENT_PREFIXES) or (
+        "__" not in eid and eid.startswith("schedule-")
+    )
+    eids = {eid} if keep else set()
     for child in toc_node.get("children", []):
         eids |= _collect_section_eids(child)
     return eids
+
+
+def _write_schedule_parts(
+    part_dir: Path, schedule_node: dict, sections: dict[str, dict]
+) -> None:
+    """Write ``part_dir/<schedule_eid>.json`` = ``{"sections": {...}}`` for
+    every unit eId at-or-under ``schedule_node`` that is present in
+    ``sections`` (Task 9). No ``definitions`` key: schedule clauses carry no
+    ``data-term`` markers in this corpus, so the reader needs none."""
+    eids = _collect_section_eids(schedule_node)
+    sched_sections = {k: sections[k] for k in eids if k in sections}
+    (part_dir / f"{schedule_node['eid']}.json").write_text(
+        json.dumps({"sections": sched_sections})
+    )
 
 
 @app.command()

@@ -1,0 +1,14 @@
+{
+  "acts": {
+    "split-sched-act": {
+      "name": "Split Schedule Act 2001",
+      "title_id": "C2004A05139",
+      "comp_id": "C2026C00101",
+      "year": 2001,
+      "number": 50,
+      "effective_date": "2026-01-01",
+      "xml_path": "xml/split-sched-act.xml"
+    }
+  },
+  "updated_at": "2026-09-04"
+}

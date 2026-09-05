@@ -1,0 +1,53 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<akomaNtoso xmlns="http://docs.oasis-open.org/legaldocml/ns/akn/3.0">
+  <act name="act">
+    <meta>
+      <identification source="#lex-au">
+        <FRBRWork>
+          <FRBRthis value="/akn/au/act/2001/50/!main"/>
+          <FRBRuri value="/akn/au/act/2001/50"/>
+        </FRBRWork>
+      </identification>
+    </meta>
+    <body>
+      <part eId="part-1">
+        <num>Part 1</num>
+        <heading>Preliminary</heading>
+        <section eId="part-1__sec-1">
+          <num>1</num>
+          <heading>Short title</heading>
+          <content>
+            <p>This Act may be cited as the Split Schedule Act 2001.</p>
+          </content>
+        </section>
+      </part>
+      <part eId="part-2">
+        <num>Part 2</num>
+        <heading>Operative provisions</heading>
+        <section eId="part-2__sec-5">
+          <num>5</num>
+          <heading>Main rule</heading>
+          <content>
+            <p>A person must comply with the requirements set out in Schedule 1.</p>
+          </content>
+        </section>
+      </part>
+    </body>
+    <attachments>
+      <attachment>
+        <hcontainer name="schedule" eId="schedule-1">
+          <num>Schedule 1</num>
+          <heading>Schedule 1</heading>
+          <hcontainer name="clause" eId="schedule-1__clause-1">
+            <num>1</num>
+            <heading>Interpretation</heading>
+            <content>
+              <p>In this Schedule, unless the contrary intention appears, a reference to a provision is a reference to a provision of this Act as amended and in force from time to time.</p>
+              <p>The requirements in this Schedule apply in addition to, and not in derogation of, any other requirement imposed by or under this Act or any other law of the Commonwealth.</p>
+            </content>
+          </hcontainer>
+        </hcontainer>
+      </attachment>
+    </attachments>
+  </act>
+</akomaNtoso>
