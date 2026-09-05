@@ -14,7 +14,14 @@ from pathlib import Path
 
 import lxml.etree as ET
 
-from build.bundle import AKN, build_sections, build_toc, _local_tag, _schedule_units
+from build.bundle import (
+    AKN,
+    build_preface,
+    build_sections,
+    build_toc,
+    _local_tag,
+    _schedule_units,
+)
 from build.ir import Node
 from build.refindex import build_ref_index
 from build.stylemap import HtmlStyleMap
@@ -436,3 +443,44 @@ def test_build_sections_skips_sections_without_an_eid() -> None:
     )
     sections, _ = build_sections(root, build_ref_index([]))
     assert list(sections) == ["s1"]
+
+
+# --------------------------------------------------------------------------- #
+# build_preface -- Task 6: <preface> has no <longTitle>; the long title is an
+# unlabelled <p> starting "An Act", buried among ~90-130 cover-page/ToC <p>s.
+# --------------------------------------------------------------------------- #
+
+
+def test_build_preface_extracts_only_the_long_title() -> None:
+    root = _parse_corpus("preface-with-toc.xml")  # cut from age-discrimination
+    p = build_preface(root)
+    assert p is not None
+    assert p["long_title"].startswith("An Act")
+    assert "Compilation No" not in p["long_title"]
+    assert "Part 1" not in p["long_title"]  # no ToC line leaked
+    assert "Definitions" not in p["long_title"]  # no ToC line leaked
+
+
+def test_build_preface_preserves_inline_emphasis() -> None:
+    p = build_preface(_parse_corpus("preface-emph.xml"))
+    assert p is not None
+    assert "<em>Digital ID Act 2024</em>" in p["long_title"]
+    # The real <formula name="enacting"> in this fixture also exercises the
+    # "enacting" field via the same _render_inline path.
+    assert p["enacting"] == "The Parliament of Australia enacts:"
+
+
+def test_build_preface_none_when_no_an_act_p() -> None:
+    # The real ~5.4% case: a Regulations instrument (made *under* an Act, not
+    # an Act itself) whose preface has no "An Act ..." <p> anywhere, no
+    # <formula>, and whose actual last <p> is a ToC/endnotes line (trailing
+    # page number) -- correctly rejected by the fallback's ToC-line check.
+    root = _parse_corpus("preface-no-longtitle.xml")
+    assert build_preface(root) is None
+
+
+def test_build_preface_none_when_absent() -> None:
+    root = ET.fromstring(
+        f'<akomaNtoso xmlns="{AKN[1:-1]}"><act><body/></act></akomaNtoso>'
+    )
+    assert build_preface(root) is None

@@ -1,0 +1,26 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<akomaNtoso xmlns="http://docs.oasis-open.org/legaldocml/ns/akn/3.0">
+  <act name="act">
+    <!-- Trimmed real-corpus fixture (lex-au-explorer Task 6). Source:
+         lex-au/repo/corpus/xml/agricultural-and-veterinary-chemicals-
+         (administration)-regulations-1995.xml <preface> (133 real <p>
+         children, no <formula>, no "An Act ..." <p> anywhere: this is a
+         Regulations instrument made *under* an Act, not an Act itself, and
+         is a real instance of the corpus's ~5.4% preface-has-no-long-title
+         case). Kept: the title/Statutory-Rules-No. cover lines, "Contents",
+         one representative Part ToC line, and the real trailing "Endnotes"
+         / "Endnote 4" lines: the actual last <p> ("Endnote 4-Amendment
+         history\t76") is correctly rejected by the fallback's
+         trailing-page-number check, so build_preface must return None.
+         Dropped: the ~125 remaining ToC/endnote lines, <meta>, <body>. -->
+    <preface>
+      <p>Agricultural and Veterinary Chemicals (Administration) Regulations&#160;1995</p>
+      <p>Statutory Rules No.&#160;28, 1995</p>
+      <p>Contents</p>
+      <p>Part&#160;1—Preliminary&#9;1</p>
+      <p>Endnotes&#9;72</p>
+      <p>Endnote 4—Amendment history&#9;76</p>
+    </preface>
+    <body/>
+  </act>
+</akomaNtoso>

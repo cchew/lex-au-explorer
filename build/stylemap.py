@@ -20,9 +20,11 @@ import html
 import os.path
 from typing import Protocol, runtime_checkable
 
+import lxml.etree as ET
+
 from build.ir import Node
 
-__all__ = ["StyleMap", "HtmlStyleMap"]
+__all__ = ["StyleMap", "HtmlStyleMap", "_render_inline"]
 
 
 @runtime_checkable
@@ -228,3 +230,62 @@ class HtmlStyleMap:
 
     def _raw(self, node: Node, children: list[str]) -> str:
         return "".join(children)
+
+
+# --------------------------------------------------------------------------- #
+# <preface> long title / enacting words (Task 6)
+# --------------------------------------------------------------------------- #
+
+
+def _render_inline(el: ET._Element) -> str:
+    """Render ``el``'s inline children (text, ``<i>``/``<b>``/``<ref>``/
+    ``<date>``/``<term>``, tails) to an HTML string via the existing Stage-1
+    inline parse path (:func:`build.parse._parse_inline_into`) + Stage-2
+    render (:func:`build.render.render_section`) -- bypassing
+    :func:`build.parse.parse_section`'s block path entirely.
+
+    That distinction matters here: ``<preface>`` has no ``<longTitle>``
+    element in this corpus, only an unlabelled ``<p>`` (the parity spike's
+    §3.1/§3.4 findings). Routing that ``<p>`` through ``parse_section`` would
+    hit ``_parse_raw`` -> ``_parse_block``'s generic fallback, which recurses
+    structurally but never calls ``_parse_inline`` -- so ``<i>``/``<b>``
+    emphasis inside it would silently render as plain text. This function
+    instead builds a throwaway ``content`` container node and appends ``el``'s
+    inline children directly via ``_parse_inline_into``, the same call
+    ``_parse_content`` makes for a real ``<p>`` inside ``<content>``.
+
+    Placement note: this lives in ``stylemap.py`` (per the design brief) even
+    though it needs ``build.parse``/``build.render``/``build.refindex``, all
+    of which sit on the far side of a circular import from here --
+    ``build.render`` imports this module (for the ``StyleMap`` protocol) and
+    ``build.parse`` imports ``build.bundle`` (for ``AKN``/``_local_tag``),
+    which itself imports this module at module level. A top-level
+    ``from build.parse import ...`` here would therefore cycle back into this
+    module before it finished defining :class:`HtmlStyleMap`. The imports
+    below are function-scoped (deferred until call time, by which point every
+    module has finished loading) to break that cycle -- the same technique
+    ``build.bundle.build_sections`` already uses for the same reason (see its
+    "Lazy: build.parse imports AKN / _local_tag back from this module."
+    comment).
+
+    ``el`` is assumed free of ``<ref>`` elements: verified against the full
+    3,076-Act lex-au corpus, zero ``<ref>`` occur inside any ``<preface>``.
+    A fresh, empty :class:`~build.refindex.RefIndex` is therefore sufficient
+    -- there is nothing for it to resolve -- and the ``section_eid=""``
+    threaded into ``_parse_inline_into`` is never consulted for the same
+    reason.
+    """
+    from build.parse import _parse_inline_into
+    from build.refindex import RefIndex
+    from build.render import render_section
+
+    container = Node("content")
+    _parse_inline_into(el, container, "", RefIndex([]))
+    # A block-wrapping element like <formula> (a <p> inside it, for the
+    # "enacting" field) carries pretty-printed indentation as the formula's
+    # own .text (before the <p>) and the <p>'s .tail (after it) -- real,
+    # verified corpus whitespace, not a fixture artifact. _parse_inline_into
+    # preserves it verbatim (by design, for genuine inline text runs), so
+    # strip only the ends here: interior whitespace from a real <p>'s own
+    # text is never pretty-print noise and must stay untouched.
+    return render_section(container, HtmlStyleMap()).strip()

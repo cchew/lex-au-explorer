@@ -28,6 +28,11 @@ export interface VerificationInfo {
   live_effective_date?: string;
 }
 
+export interface PrefaceEntry {
+  long_title: string;
+  enacting: string;
+}
+
 export interface ActBundle {
   frbr_uri: string;
   title: string;
@@ -43,4 +48,5 @@ export interface ActBundle {
   raw_xml_url: string;
   split_by_part: boolean;
   verification?: VerificationInfo;
+  preface?: PrefaceEntry;
 }

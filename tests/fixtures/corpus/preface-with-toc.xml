@@ -1,0 +1,25 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<akomaNtoso xmlns="http://docs.oasis-open.org/legaldocml/ns/akn/3.0">
+  <act name="act">
+    <!-- Trimmed real-corpus fixture (lex-au-explorer Task 6). Source:
+         lex-au/repo/corpus/xml/age-discrimination-act-2004.xml <preface>
+         (117 real <p> children, no <formula>). Kept: the short-title/No./
+         Compilation-No. cover lines, the "Contents" heading, two
+         representative ToC lines (a Part heading and a numbered section
+         entry, to prove ToC leakage is excluded), and the real trailing
+         "An Act ..." <p>: this Act's actual long title is its LAST
+         preface <p> (the ~37%-last-child case). Dropped: the ~90 remaining
+         ToC lines and the "About this compilation" boilerplate paragraph
+         bodies (kept only headings), <meta>, <body>. -->
+    <preface>
+      <p>Age Discrimination Act 2004</p>
+      <p>No.&#160;68, 2004</p>
+      <p>Compilation No.&#160;57</p>
+      <p>Contents</p>
+      <p>Part&#160;1—Preliminary&#9;1</p>
+      <p>5  Definitions&#9;3</p>
+      <p>An Act relating to discrimination on the ground of age</p>
+    </preface>
+    <body/>
+  </act>
+</akomaNtoso>

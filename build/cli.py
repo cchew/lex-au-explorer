@@ -10,7 +10,7 @@ import typer
 
 from build.metadata import load_corpus_index, build_site_index, ActMeta
 from build.assets import copy_figure_assets
-from build.bundle import build_toc, build_sections, _local_tag
+from build.bundle import build_toc, build_sections, build_preface, _local_tag
 from build.ir import Node
 from build.refindex import build_ref_index
 from build.stylemap import HtmlStyleMap, StyleMap
@@ -164,6 +164,9 @@ def build_site(
             verification_entries.get(meta.title_id), meta.comp_id, ran_at=verification_ran_at
         )
         bundle = assemble_bundle(meta, toc, sections, definitions, verification=verification)
+        preface = build_preface(root)
+        if preface:
+            bundle["preface"] = preface
 
         if meta.split_by_part:
             _write_split_bundle(out_dir, meta.slug, toc, sections, definitions, bundle)

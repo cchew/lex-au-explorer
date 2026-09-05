@@ -1,0 +1,18 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<akomaNtoso xmlns="http://docs.oasis-open.org/legaldocml/ns/akn/3.0">
+  <act name="act">
+    <!-- Trimmed real-corpus fixture (lex-au-explorer Task 6). Source:
+         lex-au/repo/corpus/xml/digital-id-(transitional-and-consequential-
+         provisions)-act-2024.xml <preface>. Kept verbatim: the long-title
+         <p> (with its real <i> emphasis around the referenced Act's short
+         title) and the real <formula name="enacting"> enacting-words
+         paragraph. Dropped: cover-page lines, ToC, <meta>, <body>. -->
+    <preface>
+      <p>An Act to deal with consequential and transitional matters arising from the enactment of the <i>Digital ID Act 2024</i>, and for related purposes</p>
+      <formula name="enacting">
+        <p>The Parliament of Australia enacts:</p>
+      </formula>
+    </preface>
+    <body/>
+  </act>
+</akomaNtoso>

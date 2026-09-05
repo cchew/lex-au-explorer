@@ -4,6 +4,7 @@ import { useRoute } from "vue-router";
 import ActSearch from "../components/ActSearch.vue";
 import ActToc from "../components/ActToc.vue";
 import ActHeader from "../components/ActHeader.vue";
+import ActPreface from "../components/ActPreface.vue";
 import SectionContent from "../components/SectionContent.vue";
 import SourceTrustPanel from "../components/SourceTrustPanel.vue";
 import type { ActBundle, SectionEntry, TocNode } from "../types";
@@ -214,6 +215,7 @@ onMounted(() => {
       </aside>
       <div class="content-pane" @click="onContentClick">
         <ActHeader :bundle="bundle" />
+        <ActPreface :bundle="bundle" />
         <SourceTrustPanel :bundle="bundle" />
         <div v-for="s in visibleSections" :key="s.eid" :id="s.eid" class="section-anchor">
           <SectionContent :section="s.section" :definitions="bundle.definitions" :slug="currentSlug ?? undefined" />

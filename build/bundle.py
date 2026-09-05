@@ -15,13 +15,14 @@ from __future__ import annotations
 
 import collections
 import copy
+import re
 from typing import Callable, Optional
 
 import lxml.etree as ET
 
 from build.ir import Node
 from build.refindex import RefIndex
-from build.stylemap import HtmlStyleMap, StyleMap
+from build.stylemap import HtmlStyleMap, StyleMap, _render_inline
 
 AKN_NS = "http://docs.oasis-open.org/legaldocml/ns/akn/3.0"
 AKN = f"{{{AKN_NS}}}"
@@ -41,7 +42,20 @@ _STRUCTURAL_TAGS = {
 # safe HTML `id` attribute character and dict key.
 _EID_DISAMBIG = "~"
 
-__all__ = ["AKN", "AKN_NS", "build_toc", "build_sections", "_local_tag"]
+__all__ = [
+    "AKN", "AKN_NS", "build_toc", "build_sections", "build_preface", "_local_tag",
+]
+
+# Fallback-candidate ToC-line rejection (Task 6, no <longTitle> in this
+# corpus -- see build_preface). A real cover-page/ToC <p> either starts with
+# a structural label ("Part 1", "Division 2", or a bare numbered entry like
+# "5  Definitions" / "1.1  Name of Regulations") or ends in a trailing page
+# number ("Endnote 4-Amendment history  76"); genuine "An Act ..." prose does
+# neither. Matched against whitespace-normalised text (see _norm_ws), so the
+# corpus's NBSP/tab formatting between a Part/Division word and its number
+# does not defeat the "\s" here.
+_TOC_PREFIX_RE = re.compile(r"^(Part\s|Division\s|\d)")
+_TOC_TRAILING_PAGE_RE = re.compile(r"\s\d+$")
 
 # Type of the optional between-stages hook: it receives every parsed section as
 # ``(eid, node)`` after Stage 1 and before Stage 2, so a caller (``build/cli.py``)
@@ -159,6 +173,137 @@ def build_toc(root: ET._Element) -> list[dict]:
             }
         )
     return out
+
+
+def _text(el: ET._Element) -> str:
+    return "".join(el.itertext())
+
+
+def _norm_ws(text: str) -> str:
+    return " ".join(text.split())
+
+
+_MIN_PROSE_WORDS = 5
+
+
+def _looks_like_prose(p: ET._Element) -> bool:
+    """False for a ToC/cover-page line -- see the ``_TOC_*`` regexes' comment
+    -- or for one of several further false-fallback shapes measured by
+    running this heuristic against the full 3,076-Act corpus (task report
+    has the numbers): pre-2000s Acts whose preface has neither an
+    "An Act ..." paragraph nor a ``<formula>`` tag overwhelmingly end their
+    preface's ``<p>`` run on a bare heading/label rather than either a real
+    ToC entry or a real long title --
+
+    * "TABLE OF PROVISIONS" / "TABLE OF PARTS" (a bare all-caps heading),
+    * "Short title and citation." (section 1's own heading, bled into the
+      preface because the Act has no ToC at all),
+    * "Contents" (the ToC's own heading, when the Act's ToC is otherwise
+      empty or absent), or
+    * the enacting words themselves, untagged as ``<formula>`` and so left
+      as a plain trailing ``<p>`` ("BE IT ENACTED by the Queen ...").
+
+    None of these has a trailing page number or a Part/Division/bare-number
+    prefix, so the ``_TOC_*`` regexes alone pass all four through as if they
+    were prose. The first three are short labels (<=4 words); rejecting
+    below :data:`_MIN_PROSE_WORDS` catches them without hand-listing every
+    boilerplate label the corpus might use. The "BE IT ENACTED" case is a
+    full sentence, long enough to survive a word-count filter, so it gets its
+    own explicit prefix check. The all-caps check is redundant with the
+    word-count filter for the two known "TABLE OF ..." headings specifically,
+    but is kept as a cheap, independent guard against a longer all-caps
+    heading elsewhere in the corpus that this task's sampling did not happen
+    to surface.
+
+    Empty text (a ``<p>`` with no content) is never prose either; without
+    that guard an empty candidate would pass every check vacuously and get
+    treated as a real long title.
+    """
+    text = _norm_ws(_text(p))
+    if not text:
+        return False
+    if _TOC_PREFIX_RE.match(text) or _TOC_TRAILING_PAGE_RE.search(text):
+        return False
+    if any(c.isalpha() for c in text) and text == text.upper():
+        return False  # "TABLE OF PROVISIONS", "TABLE OF PARTS", ...
+    if text.lower().startswith("be it enacted"):
+        return False  # enacting words mistaken for the fallback long title
+    if len(text.split()) < _MIN_PROSE_WORDS:
+        return False  # "Short title and citation.", "Contents", ...
+    return True
+
+
+def _fallback_long_title_p(
+    pf: ET._Element, formula: Optional[ET._Element]
+) -> Optional[ET._Element]:
+    """The ``<p>`` immediately before ``formula`` (or the last ``<p>`` in
+    ``pf`` if ``formula`` is ``None``), for the ~5.4% of Acts whose preface
+    has no unlabelled "An Act ..." paragraph.
+
+    "Immediately before" tolerates non-``<p>`` siblings between the
+    candidate and ``formula`` (none are known to occur in the corpus, but
+    this is cheap insurance against a structure survey missed): it is the
+    last ``<p>`` seen while walking ``pf``'s children up to ``formula``, not
+    strictly ``formula``'s direct previous sibling.
+    """
+    if formula is None:
+        ps = pf.findall(f"{AKN}p")
+        return ps[-1] if ps else None
+    candidate: Optional[ET._Element] = None
+    for child in pf:
+        if child is formula:
+            break
+        if _local_tag(child) == "p":
+            candidate = child
+    return candidate
+
+
+def build_preface(root: ET._Element) -> Optional[dict]:
+    """Extract the Act's long title + enacting formula from ``<preface>``.
+
+    There is no ``<longTitle>`` element in this corpus (parity spike §3.1):
+    ``<preface>`` is the full compilation cover page plus table of contents
+    -- ``age-discrimination-act-2004`` has 117 direct ``<p>`` children (short
+    title, "No. 68, 2004", "Compilation No. 57", "About this compilation"
+    boilerplate, then ~90 ToC lines). The actual long title is a single
+    unlabelled ``<p>`` beginning "An Act" (case-sensitive); it is the corpus's
+    LAST preface ``<p>`` only 37% of the time and is entirely absent in
+    ~5.4% of Acts (most commonly Regulations-style instruments made *under*
+    an Act rather than an Act itself, which have no "An Act ..." long title
+    to begin with).
+
+    Returns ``None`` when ``<preface>`` is absent, or when no "An Act ..."
+    paragraph exists and the fallback candidate (see
+    :func:`_fallback_long_title_p`) does not read as prose (:func:`_looks_
+    like_prose`) -- i.e. it looks like a leaked ToC/cover-page line instead
+    of a genuine long title.
+
+    ``long_title`` and ``enacting`` are rendered via
+    :func:`build.stylemap._render_inline`, which preserves ``<i>``/``<b>``
+    inline emphasis (``parse_section``'s block path would drop it -- see
+    that function's docstring).
+    """
+    pf = root.find(f".//{AKN}preface")
+    if pf is None:
+        return None
+
+    ps = pf.findall(f"{AKN}p")
+    long_p = next((p for p in ps if _norm_ws(_text(p)).startswith("An Act")), None)
+
+    enacting_el = pf.find(f"{AKN}formula")
+
+    if long_p is None:
+        candidate = _fallback_long_title_p(pf, enacting_el)
+        if candidate is not None and _looks_like_prose(candidate):
+            long_p = candidate
+
+    if long_p is None:
+        return None
+
+    return {
+        "long_title": _render_inline(long_p),
+        "enacting": _render_inline(enacting_el) if enacting_el is not None else "",
+    }
 
 
 def _toc_node(el: ET._Element) -> dict:
