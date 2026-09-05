@@ -1,0 +1,102 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<akomaNtoso xmlns="http://docs.oasis-open.org/legaldocml/ns/akn/3.0">
+  <act name="act">
+    <meta>
+      <!-- Trimmed real-corpus fixture (lex-au-explorer Task 3). Source: lex-au/repo/corpus/xml/administrative-decisions-(judicial-review)-act-1977.xml, schedule-1. Kept: full <identification>. Dropped from <meta>: <lifecycle>, <temporalData>, <references>. Body trimmed to schedule-1's <heading> + its first 10 direct <paragraph> children (of 85); the leading <content> block (a long list of excluded Acts) is dropped. This schedule has no <hcontainer name="clause"> at all, confirmed against the real corpus file. -->
+      <identification source="#lex-au">
+        <FRBRWork>
+          <FRBRthis value="/akn/au/act/1977/59/!main"/>
+          <FRBRuri value="/akn/au/act/1977/59"/>
+          <FRBRdate date="1977-01-01" name="Generation"/>
+          <FRBRauthor href="#parliament"/>
+          <FRBRcountry value="au"/>
+          <FRBRsubtype value="act"/>
+          <FRBRnumber value="59"/>
+          <FRBRname value="administrative-decisions-(judicial-review)-act-1977"/>
+          <FRBRprescriptive value="true"/>
+          <FRBRauthoritative value="true"/>
+        </FRBRWork>
+        <FRBRExpression>
+          <FRBRthis value="/akn/au/act/1977/59/eng@2026-07-01/!main"/>
+          <FRBRuri value="/akn/au/act/1977/59/eng@2026-07-01"/>
+          <FRBRdate date="2026-07-01" name="Generation"/>
+          <FRBRauthor href="#parliament"/>
+          <FRBRlanguage language="eng"/>
+        </FRBRExpression>
+        <FRBRManifestation>
+          <FRBRthis value="/akn/au/act/1977/59/eng@2026-07-01/!main.akn"/>
+          <FRBRuri value="/akn/au/act/1977/59/eng@2026-07-01/!main.akn"/>
+          <FRBRdate date="2026-09-03" name="Generation"/>
+          <FRBRauthor href="#lex-au"/>
+        </FRBRManifestation>
+      </identification>
+    </meta>
+    <attachments>
+      <attachment>
+        <hcontainer name="schedule" eId="schedule-1">
+          <heading>Classes of decisions that are not decisions to which this Act applies</heading>
+          <paragraph eId="schedule-1__para-a">
+            <num>a</num>
+            <content>
+              <p>	(a)	decisions under the <i>Fair Work Act 2009</i>, the <i>Fair Work (Registered Organisations) Act 2009</i>, the <i>Fair Work (Transitional Provisions and Consequential Amendments) Act 2009</i>, the <i>Workplace Relations Act 1996</i>, the <i>Building and Construction Industry Improvement Act 2005</i> or the <i>Fair Work (Building Industry) Act 2012</i>;</p>
+            </content>
+          </paragraph>
+          <paragraph eId="schedule-1__para-b">
+            <num>b</num>
+            <content>
+              <p>	(b)	the following decisions under the <i>Australian Charities and Not</i><i>-</i><i>for</i><i>-</i><i>profits Commission Act 2012</i>:</p>
+            </content>
+          </paragraph>
+          <paragraph eId="schedule-1__para-i">
+            <num>i</num>
+            <content>
+              <p>administrative decisions (within the meaning of that Act);</p>
+            </content>
+          </paragraph>
+          <paragraph eId="schedule-1__para-ii">
+            <num>ii</num>
+            <content>
+              <p>objection decisions (within the meaning of that Act);</p>
+            </content>
+          </paragraph>
+          <paragraph eId="schedule-1__para-iii">
+            <num>iii</num>
+            <content>
+              <p>extension of time refusal decisions (within the meaning of that Act);</p>
+            </content>
+          </paragraph>
+          <paragraph eId="schedule-1__para-c">
+            <num>c</num>
+            <content>
+              <p>	(c)	decisions under the <i>Coal Industry Act 1946</i>, other than decisions of the Joint Coal Board;</p>
+            </content>
+          </paragraph>
+          <paragraph eId="schedule-1__para-d">
+            <num>d</num>
+            <content>
+              <p>decisions under any of the following Acts:</p>
+            </content>
+          </paragraph>
+          <paragraph eId="schedule-1__para-daa">
+            <num>daa</num>
+            <content>
+              <p>	(daa)	decisions of the Minister administering the <i>Australian Security Intelligence Organisation Act 1979</i> under <ref href="#sec-58A">section&#160;58A</ref> of the <i>Telecommunications Act 1997</i>;</p>
+            </content>
+          </paragraph>
+          <paragraph eId="schedule-1__para-daaa">
+            <num>daaa</num>
+            <content>
+              <p>	(daaa)	decisions of the Minister administering the <i>Australian Security Intelligence Organisation Act 1979</i> under clause&#160;57A or 72A of Schedule&#160;3A to the <i>Telecommunications Act 1997</i>;</p>
+            </content>
+          </paragraph>
+          <paragraph eId="schedule-1__para-daaaa">
+            <num>daaaa</num>
+            <content>
+              <p>	(daaaa)	decisions under <ref href="#part-1">Part&#160;1</ref>5 of the <i>Telecommunications Act 1997</i>;</p>
+            </content>
+          </paragraph>
+        </hcontainer>
+      </attachment>
+    </attachments>
+  </act>
+</akomaNtoso>

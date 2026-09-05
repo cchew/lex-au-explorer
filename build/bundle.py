@@ -14,6 +14,7 @@ entangled here; the old ``_render_*`` helpers moved to ``build/parse.py``,
 from __future__ import annotations
 
 import collections
+import copy
 from typing import Callable, Optional
 
 import lxml.etree as ET
@@ -43,6 +44,60 @@ def _local_tag(el: ET._Element) -> str:
     return el.tag.split("}")[-1] if isinstance(el.tag, str) else ""
 
 
+def _schedule_units(sched: ET._Element) -> list:
+    """Walk one schedule's direct children in document order (Task 3, B1).
+
+    Returns an ordered list of ``("clause", clause_el)`` tuples for a real
+    ``<hcontainer name="clause">``, or ``("block", key, run_elements)``
+    tuples for a run of loose siblings (``paragraph`` / ``table`` /
+    ``content`` / ``p`` / anything else that isn't the schedule's own
+    ``<num>``/``<heading>``) grouped between clauses.
+
+    This is the single ordered walk both ``build_toc`` and ``build_sections``
+    consume, so schedule navigation and schedule rendering can never list
+    units in different orders or under different keys.
+
+    Key selection: a schedule with **no** clause anywhere keys its one run
+    (there can only be one, since nothing else triggers a flush) with the
+    bare schedule eId. Any schedule that has at least one clause keys every
+    run (pre-clause, between-clause, or trailing) as
+    ``f"{sched_eid}__block-{n}"`` -- ``had_clause`` is a fixed, whole-schedule
+    fact decided up front, not "seen a clause yet in the walk so far".
+    """
+    sched_eid = sched.get("eId", "") or ""
+    had_clause = any(
+        _local_tag(c) == "hcontainer" and c.get("name") == "clause" for c in sched
+    )
+    units: list = []
+    run: list[ET._Element] = []
+    block_n = 0
+
+    def flush() -> None:
+        nonlocal run, block_n
+        if not run:
+            return
+        key = (
+            f"{sched_eid}__block-{block_n}"
+            if had_clause or block_n > 0
+            else sched_eid
+        )
+        units.append(("block", key, run))
+        block_n += 1
+        run = []
+
+    for child in sched:
+        tag = _local_tag(child)
+        if tag == "hcontainer" and child.get("name") == "clause":
+            flush()
+            units.append(("clause", child))
+        elif tag in ("num", "heading"):
+            continue
+        else:
+            run.append(child)
+    flush()
+    return units
+
+
 def build_toc(root: ET._Element) -> list[dict]:
     body = root.find(f".//{AKN}body")
     out: list[dict] = (
@@ -52,16 +107,28 @@ def build_toc(root: ET._Element) -> list[dict]:
     for sched in root.iterfind(
         f".//{AKN}attachments/{AKN}attachment/{AKN}hcontainer[@name='schedule']"
     ):
-        clauses = [
-            {"eid": c.get("eId", ""), "heading": _entry_heading(c), "children": []}
-            for c in sched.iterfind(f"{AKN}hcontainer[@name='clause']")
-        ]
+        children: list[dict] = []
+        for unit in _schedule_units(sched):
+            if unit[0] == "clause":
+                clause = unit[1]
+                children.append(
+                    {
+                        "eid": clause.get("eId", ""),
+                        "heading": _entry_heading(clause),
+                        "children": [],
+                    }
+                )
+            else:
+                _, key, _run = unit
+                # Synthetic (loose-prose) units have no <heading> of their
+                # own; Task 5 adds a proper label.
+                children.append({"eid": key, "heading": "", "children": []})
         out.append(
             {
                 # Task 5 adds a proper "Schedule N" label; heading-text-only for now.
                 "eid": sched.get("eId", ""),
                 "heading": _entry_heading(sched),
-                "children": clauses,
+                "children": children,
             }
         )
     return out
@@ -147,14 +214,31 @@ def build_sections(
     for sched in root.iterfind(
         f".//{AKN}attachments/{AKN}attachment/{AKN}hcontainer[@name='schedule']"
     ):
-        for clause in sched.iterfind(f"{AKN}hcontainer[@name='clause']"):
-            eid = clause.get("eId", "")
-            if not eid:
-                continue
-            node = parse_section(clause, ref_index)
-            heading = _entry_heading(clause)  # Task 5 will refine
-            _add_entry(
-                sections, eid, heading, render_section(node, active_style), ref_index.tally
-            )
+        for unit in _schedule_units(sched):
+            if unit[0] == "clause":
+                clause = unit[1]
+                eid = clause.get("eId", "")
+                if not eid:
+                    continue
+                node = parse_section(clause, ref_index)
+                heading = _entry_heading(clause)  # Task 5 will refine
+                _add_entry(
+                    sections, eid, heading, render_section(node, active_style), ref_index.tally
+                )
+            else:
+                _, key, run = unit
+                # Task 1 BINDING: deepcopy each loose sibling into a detached
+                # <hcontainer> -- never move live nodes (that would empty the
+                # source schedule, which build_toc / build_sections both read
+                # from the same `root` elsewhere).
+                wrap = ET.Element(f"{AKN}hcontainer")
+                for el in run:
+                    wrap.append(copy.deepcopy(el))
+                node = parse_section(wrap, ref_index)
+                # Synthetic units have no <heading> of their own; Task 5
+                # refines schedule-unit labelling.
+                _add_entry(
+                    sections, key, "", render_section(node, active_style), ref_index.tally
+                )
 
     return sections, ref_index.tally

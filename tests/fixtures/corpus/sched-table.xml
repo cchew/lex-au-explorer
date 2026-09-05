@@ -1,0 +1,68 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<akomaNtoso xmlns="http://docs.oasis-open.org/legaldocml/ns/akn/3.0">
+  <act name="act">
+    <meta>
+      <!-- Trimmed real-corpus fixture (lex-au-explorer Task 3). Source: lex-au/repo/corpus/xml/age-discrimination-act-2004.xml, schedule-1. Kept: full <identification>. Dropped from <meta>: <lifecycle>, <temporalData>, <references>. Body trimmed to schedule-1's <heading> + its single direct <table> child, subset to its first 6 <tr> rows (of 56): 2 header rows + 4 item rows. This schedule has no <hcontainer name="clause"> and no other direct child besides <heading>/<table>, confirmed against the real corpus file. -->
+      <identification source="#lex-au">
+        <FRBRWork>
+          <FRBRthis value="/akn/au/act/2004/68/!main"/>
+          <FRBRuri value="/akn/au/act/2004/68"/>
+          <FRBRdate date="2004-01-01" name="Generation"/>
+          <FRBRauthor href="#parliament"/>
+          <FRBRcountry value="au"/>
+          <FRBRsubtype value="act"/>
+          <FRBRnumber value="68"/>
+          <FRBRname value="age-discrimination-act-2004"/>
+          <FRBRprescriptive value="true"/>
+          <FRBRauthoritative value="true"/>
+        </FRBRWork>
+        <FRBRExpression>
+          <FRBRthis value="/akn/au/act/2004/68/eng@2026-07-01/!main"/>
+          <FRBRuri value="/akn/au/act/2004/68/eng@2026-07-01"/>
+          <FRBRdate date="2026-07-01" name="Generation"/>
+          <FRBRauthor href="#parliament"/>
+          <FRBRlanguage language="eng"/>
+        </FRBRExpression>
+        <FRBRManifestation>
+          <FRBRthis value="/akn/au/act/2004/68/eng@2026-07-01/!main.akn"/>
+          <FRBRuri value="/akn/au/act/2004/68/eng@2026-07-01/!main.akn"/>
+          <FRBRdate date="2026-09-03" name="Generation"/>
+          <FRBRauthor href="#lex-au"/>
+        </FRBRManifestation>
+      </identification>
+    </meta>
+    <attachments>
+      <attachment>
+        <hcontainer name="schedule" eId="schedule-1">
+          <heading>Laws for which an exemption is provided by subsection&#160;39(1)</heading>
+          <table>
+            <tr>
+              <td>Laws for which an exemption is provided by subsection&#160;39(1)</td>
+              <td>Laws for which an exemption is provided by subsection&#160;39(1)</td>
+            </tr>
+            <tr>
+              <td>Item</td>
+              <td>Law</td>
+            </tr>
+            <tr>
+              <td>3</td>
+              <td>Aboriginal Land and Waters (Jervis Bay Territory) Act 1986</td>
+            </tr>
+            <tr>
+              <td>4</td>
+              <td>Aboriginal Land (Lake Condah and Framlingham Forest) Act 1987</td>
+            </tr>
+            <tr>
+              <td>5</td>
+              <td>Aboriginal Land Rights (Northern Territory) Act 1976</td>
+            </tr>
+            <tr>
+              <td>6</td>
+              <td>Administrative Review Tribunal Act 2024</td>
+            </tr>
+          </table>
+        </hcontainer>
+      </attachment>
+    </attachments>
+  </act>
+</akomaNtoso>

@@ -144,6 +144,37 @@ def test_schedule_clause_reaches_bundle_and_toc() -> None:
     )
 
 
+def test_paragraph_only_schedule_items_render() -> None:
+    root = _parse_corpus("sched-paragraphs.xml")
+    ix = build_ref_index(_all_nav_eids(root))
+    sections, _ = build_sections(root, ix)
+    blob = " ".join(v["html"] for k, v in sections.items() if k.startswith("schedule-1"))
+    assert "Coal Industry Act 1946" in blob  # an item's text
+    assert build_toc(root)[-1]["children"]  # schedule node has unit children
+
+
+def test_schedule_level_table_renders_rows() -> None:
+    root = _parse_corpus("sched-table.xml")
+    ix = build_ref_index(_all_nav_eids(root))
+    sections, _ = build_sections(root, ix)
+    blob = " ".join(v["html"] for k, v in sections.items() if k.startswith("schedule-1"))
+    assert blob.count("<tr") >= 5 and "<table" in blob
+
+
+def test_build_sections_does_not_mutate_schedule_source_tree() -> None:
+    # Task 3 BINDING: the transient wrapper used for synthetic (loose-prose)
+    # units must be built by deepcopy into a detached <hcontainer>, never by
+    # moving live nodes. sched-clause.xml has a loose <content> note before
+    # its one real clause, so this fixture exercises both code paths (the
+    # synthetic-run flush AND the real-clause branch) in one document.
+    root = _parse_corpus("sched-clause.xml")
+    before = ET.tostring(root)
+    ix = build_ref_index(_all_nav_eids(root))
+    build_sections(root, ix)
+    after = ET.tostring(root)
+    assert before == after
+
+
 def test_build_sections_skips_sections_without_an_eid() -> None:
     root = ET.fromstring(
         f'<akomaNtoso xmlns="{AKN[1:-1]}"><act><body>'
