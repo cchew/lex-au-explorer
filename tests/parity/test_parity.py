@@ -28,6 +28,7 @@ from pathlib import Path
 
 import lxml.etree as ET
 
+from build.bundle import build_preface, build_sections
 from build.parse import parse_section
 from build.refindex import build_ref_index
 from build.render import render_section
@@ -428,6 +429,226 @@ def test_penalty_block_renders_penaltytext() -> None:
     html = render_section(node, HtmlStyleMap())
     assert '<div class="akn-penaltytext">' in html
     assert "Penalty: 50 penalty units." in html
+
+
+# --------------------------------------------------------------------------- #
+# Task 12: pipeline-level parity checks
+#
+# These seven exercise renderer paths the single-element `_check_fixture` model
+# cannot reach on its own. `_check_fixture` renders ONE `parse_section` target;
+# a `<paragraph>`-only schedule, an eId collision, a `<preface>` (no eId at all)
+# and a part-level head-note all need the real `build_sections` / `build_preface`
+# pipeline function, so each gets a dedicated test that drives that function
+# directly and asserts inline. The multi-line-cell table and the real figure are
+# ordinary single-element renders, but they assert the *opposite* of the figure
+# placeholder guard baked into `_render_fixture`, so they also stand alone.
+# --------------------------------------------------------------------------- #
+
+
+def _ref_index_for(root: ET._Element):
+    return build_ref_index([el.get("eId") for el in root.iter() if el.get("eId")])
+
+
+def _sections_text(sections: dict, key: str) -> str:
+    """Normalised plain text of one `build_sections` entry's html."""
+    return _normalise(_html_to_text(sections[key]["html"]))
+
+
+def test_paragraph_only_schedule_pipeline() -> None:
+    """Check 1: a schedule with zero `<hcontainer name="clause">` -- its loose
+    `<paragraph>` run is grouped by `build_sections`' schedule pass and keyed
+    under the bare schedule eId. Every real item text renders, in document
+    order. Fixture reused: `sched-paragraphs.xml` (Task 3)."""
+    root = ET.parse(str(_FIXTURES / "sched-paragraphs.xml")).getroot()
+    sections, _ = build_sections(root, _ref_index_for(root))
+
+    schedule_keys = [k for k in sections if k.startswith("schedule-")]
+    assert schedule_keys == ["schedule-1"], (
+        "expected the loose paragraph run under the bare schedule eId, got "
+        + repr(schedule_keys)
+    )
+    haystack = _normalise(
+        _html_to_text(" ".join(sections[k]["html"] for k in schedule_keys))
+    )
+    # Inline oracle: real item phrases transcribed from sched-paragraphs.xml,
+    # in the order the <paragraph> siblings appear.
+    oracle = [
+        "decisions under the Fair Work Act 2009",
+        "the following decisions under the Australian Charities and "
+        "Not-for-profits Commission Act 2012",
+        "administrative decisions (within the meaning of that Act);",
+        "objection decisions (within the meaning of that Act);",
+        "extension of time refusal decisions (within the meaning of that Act);",
+        "decisions under the Coal Industry Act 1946, other than decisions of "
+        "the Joint Coal Board;",
+        "decisions under any of the following Acts:",
+    ]
+    _assert_ordered_subsequence(
+        [_normalise(p) for p in oracle], haystack, name="sched-paragraphs-pipeline"
+    )
+
+
+def test_schedule_level_table_pipeline() -> None:
+    """Check 2: a schedule whose only content is a `<table>` -- `build_sections`
+    renders it as one entry; the html carries a real `<table>` and every row.
+    Fixture reused: `sched-table.xml` (Task 3). The fixture keeps 6 `<tr>`
+    (2 header + 4 item rows)."""
+    root = ET.parse(str(_FIXTURES / "sched-table.xml")).getroot()
+    sections, _ = build_sections(root, _ref_index_for(root))
+
+    blob = " ".join(
+        v["html"] for k, v in sections.items() if k.startswith("schedule-")
+    )
+    assert "<table" in blob, "schedule <table> did not render as a table"
+    assert blob.count("<tr") >= 6, (
+        "expected >= 6 rendered <tr> (fixture has 2 header + 4 item rows), got "
+        + str(blob.count("<tr"))
+    )
+
+
+def test_multiline_cell_renders_break() -> None:
+    """Check 3: a `<td>` carrying a literal intra-cell newline renders each
+    line separated by a real `<br>` in the html (not merely both words in the
+    stripped text). Fixture reused: `itaa97-rate-table.xml` (Task 1) -- a
+    verbatim real-corpus cut whose item-3 `See:`-case cell is a genuine
+    3-line cell; the v0.9.1 corpus was not available locally to cut a fresh
+    one, and fabricating a fixture has worse provenance than a real cut that
+    already exercises this exact path (`build.parse._parse_cell` ->
+    `HtmlStyleMap._cell`)."""
+    root = ET.parse(str(_FIXTURES / "itaa97-rate-table.xml")).getroot()
+    target = root.find(".//*[@eId='chapter-1__part-1-3__dvs-4__sec-4-15']")
+    assert target is not None
+    html = render_section(
+        parse_section(target, _ref_index_for(root)), HtmlStyleMap()
+    )
+
+    expected_cell = (
+        "A shipowner or charterer:<br>"
+        "has its principal place of business outside Australia; and<br>"
+        "carries passengers, freight or mail shipped in Australia"
+    )
+    assert expected_cell in html, (
+        "multi-line <td> did not render its lines <br>-separated in the html"
+    )
+    # And the stripped text still carries both ends of the split.
+    text = _normalise(_html_to_text(html))
+    assert "A shipowner or charterer:" in text
+    assert "carries passengers, freight or mail shipped in Australia" in text
+
+
+def test_preface_long_title_pipeline() -> None:
+    """Check 4: `<preface>` has no eId, so `_check_fixture` cannot reach it --
+    `build_preface` extracts the long title. Fixture reused:
+    `preface-with-toc.xml` (Task 6), the ~37% case where the real "An Act ..."
+    paragraph is the LAST preface `<p>`, after cover lines and leaked ToC
+    entries that must be excluded."""
+    root = ET.parse(str(_FIXTURES / "preface-with-toc.xml")).getroot()
+    preface = build_preface(root)
+
+    assert preface is not None, "build_preface returned None for a real preface"
+    assert (
+        "An Act relating to discrimination on the ground of age"
+        in preface["long_title"]
+    ), (
+        "long title not extracted; got " + repr(preface["long_title"])
+    )
+    # The leaked ToC lines ("Contents", "Part 1-Preliminary", "5  Definitions")
+    # must not bleed into the long title.
+    assert "Definitions" not in preface["long_title"]
+    assert "Contents" not in preface["long_title"]
+
+
+def test_preface_long_title_keeps_inline_emphasis() -> None:
+    """Check 4 (companion): the enacting-formula preface variant -- long title
+    renders with its `<i>` emphasis preserved (build_preface uses the inline
+    renderer, not parse_section's block path). Fixture reused:
+    `preface-emph.xml` (Task 6)."""
+    root = ET.parse(str(_FIXTURES / "preface-emph.xml")).getroot()
+    preface = build_preface(root)
+
+    assert preface is not None
+    assert preface["long_title"].startswith(
+        "An Act to deal with consequential and transitional matters"
+    )
+    assert "<em>Digital ID Act 2024</em>" in preface["long_title"]
+    assert "The Parliament of Australia enacts:" in preface["enacting"]
+
+
+def test_part_level_headnote_pipeline() -> None:
+    """Check 5: block prose sitting DIRECTLY inside a `<chapter>` (outside any
+    `<section>`) is the container's head-note -- `build_sections`' head-note
+    pass renders it under a `<container eId>__head` key. Fixture reused:
+    `part-headnote.xml` (Task 7); its head-note-bearing container is
+    `chapter-2`."""
+    root = ET.parse(str(_FIXTURES / "part-headnote.xml")).getroot()
+    sections, _ = build_sections(root, _ref_index_for(root))
+
+    assert "chapter-2__head" in sections, (
+        "no __head entry for the chapter's introductory prose; got "
+        + repr(sorted(sections))
+    )
+    head_html = sections["chapter-2__head"]["html"]
+    assert "INTRODUCTORY NOTE" in head_html
+    assert (
+        "This Chapter is about ways in which evidence is adduced." in head_html
+    )
+    # part-2.2 has only <section> children -> it must NOT get a __head entry.
+    assert "chapter-2__part-2.2__head" not in sections
+
+
+def test_real_figure_renders_img_not_placeholder() -> None:
+    """Check 6: the inverse of `_render_fixture`'s figure guard -- when the
+    figure's asset is present, `_figure` emits a real `<img src="/data/images/
+    ...">` and NO `akn-figure-missing` placeholder. Fixture reused:
+    `itaa97-figure.xml` (Task 1). Mirrors `tests/test_assets.py`'s
+    asset-present branch: `_figure` only checks the `asset` flag, so setting it
+    on the parsed node is enough (no real binary needed)."""
+    root = ET.parse(str(_FIXTURES / "itaa97-figure.xml")).getroot()
+    target = root.find(".//*[@eId='chapter-1__part-1-3__dvs-4__sec-4-10']")
+    assert target is not None
+    node = parse_section(target, _ref_index_for(root))
+
+    figure = next((n for n in _iter_nodes(node) if n.kind == "figure"), None)
+    assert figure is not None, "fixture lost its <figure> node"
+    assert figure.attrs.get("src", "").endswith(
+        "income-tax-assessment-act-1997-fig-2.png"
+    )
+    figure.attrs["asset"] = True
+
+    html = render_section(node, HtmlStyleMap())
+    assert 'akn-figure-missing' not in html, (
+        "asset-present figure still rendered the missing-asset placeholder"
+    )
+    assert re.search(
+        r'<img src="/data/images/income-tax-assessment-act-1997-fig-2\.png"',
+        html,
+    ), "expected a real /data/images/ <img src>, got: " + html
+
+
+def test_eid_collision_act_keeps_both_clause_30() -> None:
+    """Check 7: two distinct `<clause>` elements share eId
+    `schedule-1__clause-30`; `build_sections` (`_add_entry`) must keep both --
+    the second disambiguated to `schedule-1__clause-30~2` -- with no content
+    cross-contamination. Fixture reused: `sched-dup-eid.xml` (Task 4). Overlaps
+    `tests/test_bundle.py` deliberately: this is the parity-harness angle."""
+    root = ET.parse(str(_FIXTURES / "sched-dup-eid.xml")).getroot()
+    sections, counts = build_sections(root, _ref_index_for(root))
+
+    assert "schedule-1__clause-30" in sections
+    assert "schedule-1__clause-30~2" in sections
+    assert counts["disambiguated_eids"] == 1
+    first = sections["schedule-1__clause-30"]["html"]
+    second = sections["schedule-1__clause-30~2"]["html"]
+    assert first != second, "the two clause-30 entries rendered identically"
+
+    first_text = _sections_text(sections, "schedule-1__clause-30")
+    second_text = _sections_text(sections, "schedule-1__clause-30~2")
+    # Distinctive phrase from the position-63 "Standard rate" clause.
+    assert "worked out using the following table" in first_text
+    assert "worked out using the following table" not in second_text
+    # Distinctive phrase from the position-96 definitions clause.
+    assert "has the same meaning as in" in second_text
+    assert "has the same meaning as in" not in first_text
 
 
 def test_extract_docx_importable() -> None:
