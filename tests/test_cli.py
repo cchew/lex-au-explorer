@@ -520,7 +520,29 @@ def test_schedule_heavy_non_part_act_promoted(tmp_path, monkeypatch):
     assert idx["split_schedules"] is True
     assert idx["sections"]  # body sections still inline
     assert not any(k.startswith("schedule-") for k in idx["sections"])
-    assert (out_dir / "split-sched-act" / "schedule-1.json").exists()
+
+    sched = json.loads((out_dir / "split-sched-act" / "schedule-1.json").read_text())
+    assert "schedule-1__clause-1" in sched["sections"]  # real unit, not empty
+    assert "definitions" not in sched
+
+
+def test_schedule_under_threshold_stays_inline(tmp_path):
+    """Negative case: a not-part-split Act whose schedule html is under
+    _SCHEDULE_SPLIT_BYTES is written as one plain <slug>.json -- no
+    split_schedules flag, schedule units inline, no <slug>/ directory."""
+    out_dir = tmp_path / "data"
+    build_site(
+        corpus_index=FIXTURES / "split-sched-corpus-index.json",
+        xml_dir=FIXTURES / "xml",
+        graph_path=None,
+        out_dir=out_dir,
+    )
+
+    bundle = json.loads((out_dir / "split-sched-act.json").read_text())
+    assert "split_schedules" not in bundle
+    assert "schedule-1__clause-1" in bundle["sections"]  # schedule inline
+    assert "part-1__sec-1" in bundle["sections"]  # body inline too
+    assert not (out_dir / "split-sched-act").exists()  # no split dir
 
 
 def test_collect_section_eids_recurses_into_divisions():
