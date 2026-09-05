@@ -32,6 +32,15 @@ _STRUCTURAL_TAGS = {
     "part", "division", "subdivision", "subDivision", "chapter", "section",
 }
 
+# Disambiguator for colliding schedule-unit eIds (Task 4). The converter
+# flattens schedule Part/Division numbering, so a schedule can legitimately
+# contain two distinct <clause> elements sharing one eId (see
+# tests/fixtures/corpus/sched-dup-eid.xml and ../lex-au/repo/FUTURE.md). "~"
+# does not occur in any eId in the lex-au corpus (verified via
+# `grep -ohE 'eId="[^"]*"' corpus/xml/*.xml | grep -c '~'` -> 0), and is a
+# safe HTML `id` attribute character and dict key.
+_EID_DISAMBIG = "~"
+
 __all__ = ["AKN", "AKN_NS", "build_toc", "build_sections", "_local_tag"]
 
 # Type of the optional between-stages hook: it receives every parsed section as
@@ -108,18 +117,26 @@ def build_toc(root: ET._Element) -> list[dict]:
         f".//{AKN}attachments/{AKN}attachment/{AKN}hcontainer[@name='schedule']"
     ):
         children: list[dict] = []
+        # Task 4: mirror _add_entry's disambiguation (against a per-schedule
+        # set instead of the `sections` dict, which build_toc never sees) so
+        # the TOC lists the same keys build_sections actually wrote.
+        used: set[str] = set()
         for unit in _schedule_units(sched):
             if unit[0] == "clause":
                 clause = unit[1]
+                key = _next_free_key(clause.get("eId", ""), lambda k: k in used)
+                used.add(key)
                 children.append(
                     {
-                        "eid": clause.get("eId", ""),
+                        "eid": key,
                         "heading": _entry_heading(clause),
                         "children": [],
                     }
                 )
             else:
-                _, key, _run = unit
+                _, raw_key, _run = unit
+                key = _next_free_key(raw_key, lambda k: k in used)
+                used.add(key)
                 # Synthetic (loose-prose) units have no <heading> of their
                 # own; Task 5 adds a proper label.
                 children.append({"eid": key, "heading": "", "children": []})
@@ -150,6 +167,25 @@ def _entry_heading(el: ET._Element) -> str:
     return (heading_el.text or "").strip() if heading_el is not None else ""
 
 
+def _next_free_key(eid: str, taken: Callable[[str], bool]) -> str:
+    """The bundle key ``eid`` should resolve to, given ``taken(key)`` -- a
+    membership predicate over keys already in use.
+
+    ``eid`` itself if free; otherwise ``f"{eid}{_EID_DISAMBIG}{n}"`` for the
+    smallest free ``n`` starting at 2. This is the single disambiguation rule
+    shared by :func:`_add_entry` (checked against the ``sections`` dict it is
+    about to write into) and :func:`build_toc` (checked against a per-schedule
+    ``set`` -- see its schedule loop) so the two never disagree on the key a
+    colliding schedule unit gets.
+    """
+    if not taken(eid):
+        return eid
+    n = 2
+    while taken(f"{eid}{_EID_DISAMBIG}{n}"):
+        n += 1
+    return f"{eid}{_EID_DISAMBIG}{n}"
+
+
 def _add_entry(
     sections: dict[str, dict],
     eid: str,
@@ -157,15 +193,35 @@ def _add_entry(
     html: str,
     counts: "collections.Counter[str]",
 ) -> str:
-    """Record one bundle entry under ``eid``.
+    """Record one bundle entry, disambiguating ``eid`` if it collides.
 
-    ``counts`` is unused here -- it is threaded through now so every call site
-    already passes it. Task 4 makes collisions (schedule paragraph eIds repeat
-    within a clause, see the parity spike) safe and starts recording
-    disambiguation events into ``counts``.
+    Schedule clause eIds can repeat across a schedule (the converter flattens
+    Part/Division numbering -- see ``tests/fixtures/corpus/sched-dup-eid.xml``
+    and ``../lex-au/repo/FUTURE.md``). A colliding ``eid`` would otherwise
+    silently overwrite the earlier entry, permanently losing its content.
+
+    On collision the returned key is ``f"{eid}{_EID_DISAMBIG}{n}"`` (n >= 2,
+    ``counts["disambiguated_eids"]`` incremented once per collision) and the
+    first ``id="{eid}"`` occurrence in ``html`` -- ``render_section`` /
+    ``HtmlStyleMap`` always stamp the *original* eid, since ``parse_section``
+    has no eid-override hook -- is rewritten to ``id="{key}"`` so
+    ``getElementById`` / ``data-eid`` navigation reaches the disambiguated
+    unit rather than the first (differently-keyed) one.
+
+    Note: this is a collision axis distinct from -- and not addressed by --
+    the duplicate `id=` attributes that can appear *within* one already
+    -rendered clause's html (repeated `para-a`/`para-b` siblings sharing an
+    eId inside a single clause, e.g. sched-clause.xml's
+    schedule-1__clause-70-20); that is baked in by parse.py/stylemap.py before
+    `_add_entry` ever sees the html string, so it is out of this function's
+    reach (Task 4 report).
     """
-    sections[eid] = {"heading": heading, "html": html}
-    return eid
+    key = _next_free_key(eid, lambda k: k in sections)
+    if key != eid:
+        counts["disambiguated_eids"] += 1
+        html = html.replace(f'id="{eid}"', f'id="{key}"', 1)
+    sections[key] = {"heading": heading, "html": html}
+    return key
 
 
 def build_sections(
@@ -222,7 +278,15 @@ def build_sections(
                     continue
                 node = parse_section(clause, ref_index)
                 heading = _entry_heading(clause)  # Task 5 will refine
-                _add_entry(
+                # The returned key (== eid unless _add_entry disambiguated a
+                # collision) is captured, not just discarded, per Task 4: it
+                # is the actual key this unit landed under in `sections`.
+                # build_toc computes the matching key independently (via
+                # _next_free_key over its own per-schedule `used` set, since
+                # it never sees `sections`) rather than consuming this one --
+                # see build_toc's schedule loop -- so it is not threaded
+                # further here, but every caller must not silently ignore it.
+                _key = _add_entry(
                     sections, eid, heading, render_section(node, active_style), ref_index.tally
                 )
             else:
@@ -237,7 +301,7 @@ def build_sections(
                 node = parse_section(wrap, ref_index)
                 # Synthetic units have no <heading> of their own; Task 5
                 # refines schedule-unit labelling.
-                _add_entry(
+                _key = _add_entry(
                     sections, key, "", render_section(node, active_style), ref_index.tally
                 )
 

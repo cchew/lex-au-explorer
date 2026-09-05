@@ -1,0 +1,123 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<akomaNtoso xmlns="http://docs.oasis-open.org/legaldocml/ns/akn/3.0">
+  <act name="act">
+    <meta><!-- Trimmed real-corpus fixture (lex-au-explorer Task 4). Source: lex-au/repo/corpus/xml/a-new-tax-system-(family-assistance)-act-1999.xml, schedule-1 ("Family tax benefit rate calculator"). This schedule has 107 direct <clause> children; the converter flattens Part/Division numbering so eId="schedule-1__clause-30" occurs TWICE (index 63, "Standard rate", originally under Part 2; index 96, a large definitions clause, originally under Part 3) with entirely different content: the real-world eId collision Task 4 disambiguates. Kept: full <identification>; both clause-30 elements (first kept whole, it is short; second trimmed to num/heading/content/one subclause only, dropping its own many internal repeated para-a/b children, an orthogonal separate nested-eId collision, see sched-clause.xml / Task 2 spec B2, to keep this fixture's one collision axis unambiguous, while keeping ONE real nested provision so the id-reachability test has something to check); clause-31 (trimmed to subclause-1 + para-a/para-b + one closing content block, dropping subclause-2 onward) and clause-39 (already minimal in the source) as real intervening neighbours, preserved in original document order. Dropped from meta: references, lifecycle, temporalData. Dropped from schedule-1: all other 103 clauses.--><identification source="#lex-au">
+        <FRBRWork>
+          <FRBRthis value="/akn/au/act/1999/80/!main"/>
+          <FRBRuri value="/akn/au/act/1999/80"/>
+          <FRBRdate date="1999-01-01" name="Generation"/>
+          <FRBRauthor href="#parliament"/>
+          <FRBRcountry value="au"/>
+          <FRBRsubtype value="act"/>
+          <FRBRnumber value="80"/>
+          <FRBRname value="a-new-tax-system-(family-assistance)-act-1999"/>
+          <FRBRprescriptive value="true"/>
+          <FRBRauthoritative value="true"/>
+        </FRBRWork>
+        <FRBRExpression>
+          <FRBRthis value="/akn/au/act/1999/80/eng@2026-07-01/!main"/>
+          <FRBRuri value="/akn/au/act/1999/80/eng@2026-07-01"/>
+          <FRBRdate date="2026-07-01" name="Generation"/>
+          <FRBRauthor href="#parliament"/>
+          <FRBRlanguage language="eng"/>
+        </FRBRExpression>
+        <FRBRManifestation>
+          <FRBRthis value="/akn/au/act/1999/80/eng@2026-07-01/!main.akn"/>
+          <FRBRuri value="/akn/au/act/1999/80/eng@2026-07-01/!main.akn"/>
+          <FRBRdate date="2026-09-03" name="Generation"/>
+          <FRBRauthor href="#lex-au"/>
+        </FRBRManifestation>
+      </identification>
+      </meta>
+    <attachments>
+      <attachment>
+        <hcontainer name="schedule" eId="schedule-1"><heading>Family tax benefit rate calculator</heading><hcontainer name="clause" eId="schedule-1__clause-30">
+            <num>30</num>
+            <heading>Standard rate</heading>
+            <content>
+              <p>Subject to clause 31, an individual’s standard rate is worked out using the following table. Work out which family situation applies to the individual. The standard rate is the corresponding amount in column 2.</p>
+            </content>
+            <table>
+              <tr>
+                <td>Standard rates
+(Part B)</td>
+                <td>Standard rates
+(Part B)</td>
+                <td>Standard rates
+(Part B)</td>
+              </tr>
+              <tr>
+                <td/>
+                <td>Column 1
+Family situation</td>
+                <td>Column 2
+Standard rate</td>
+              </tr>
+              <tr>
+                <td>1</td>
+                <td>youngest FTB child is under 5 years of age</td>
+                <td>$2,569.60</td>
+              </tr>
+              <tr>
+                <td>2</td>
+                <td>youngest FTB child is 5 years of age or over</td>
+                <td>$1,781.20</td>
+              </tr>
+            </table>
+          </hcontainer>
+          <hcontainer name="clause" eId="schedule-1__clause-31">
+            <num>31</num>
+            <heading>Sharing family tax benefit (shared care percentages)</heading>
+            <hcontainer name="subclause" eId="schedule-1__clause-31__subclause-1">
+              <num>1</num>
+              <content>
+                <p>If:</p>
+              </content>
+            </hcontainer>
+            <paragraph eId="schedule-1__clause-31__para-a">
+              <num>a</num>
+              <content>
+                <p>an individual has a shared care percentage for an FTB child of the individual; and</p>
+              </content>
+            </paragraph>
+            <paragraph eId="schedule-1__clause-31__para-b">
+              <num>b</num>
+              <content>
+                <p>the child is the individual’s only FTB child;</p>
+              </content>
+            </paragraph>
+            <content>
+              <p>the individual’s standard rate is the individual’s shared care percentage of the standard rate that would otherwise apply.</p>
+            </content>
+            </hcontainer>
+          <hcontainer name="clause" eId="schedule-1__clause-39">
+            <num>39</num>
+            <heading>Rate of benefit for certain recipients of pensions under the Veterans’ Entitlements Act</heading>
+            <hcontainer name="subclause" eId="schedule-1__clause-39__subclause-1">
+              <num>1</num>
+              <content>
+                <p>In this clause:</p>
+              </content>
+            </hcontainer>
+          </hcontainer>
+          <hcontainer name="clause" eId="schedule-1__clause-30">
+            <num>30</num>
+            <heading>June 2000 rate, in relation to an individual, means the amount worked out according to subclause (6).</heading>
+            <content>
+              <p><b><i>d</i></b><b><i>ependant</i></b> has the same meaning as in <ref href="#dvs-5">Division 5</ref> of <ref href="#part-I">Part I</ref>I of the <i>Income Tax Rates Act 1986</i> as that Act applied to the income year that commenced on 1 July 1999.</p>
+              <p><b><i>f</i></b><b><i>amily tax assistance person</i></b> means:</p>
+              <p><b><i>partner</i></b>, in relation to an individual, means the person who:</p>
+              <p><b><i>special Part A rate</i></b>, in relation to an individual, means the amount worked out according to subclause (7).</p>
+            </content>
+            <hcontainer name="subclause" eId="schedule-1__clause-30__subclause-2">
+              <num>2</num>
+              <content>
+                <p>Subject to subclause (3), this clause applies to an individual if:</p>
+              </content>
+            </hcontainer>
+            </hcontainer>
+          </hcontainer>
+      </attachment>
+    </attachments>
+  </act>
+</akomaNtoso>

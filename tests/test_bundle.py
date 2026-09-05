@@ -14,7 +14,7 @@ from pathlib import Path
 
 import lxml.etree as ET
 
-from build.bundle import AKN, build_sections, build_toc, _local_tag
+from build.bundle import AKN, build_sections, build_toc, _local_tag, _schedule_units
 from build.ir import Node
 from build.refindex import build_ref_index
 from build.stylemap import HtmlStyleMap
@@ -173,6 +173,116 @@ def test_build_sections_does_not_mutate_schedule_source_tree() -> None:
     build_sections(root, ix)
     after = ET.tostring(root)
     assert before == after
+
+
+# --------------------------------------------------------------------------- #
+# eId-collision disambiguation -- Task 4
+# --------------------------------------------------------------------------- #
+
+
+def test_duplicate_clause_eids_both_kept() -> None:
+    """Real-corpus regression: the converter flattens schedule Part/Division
+    numbering so a-new-tax-system-(family-assistance)-act-1999's schedule-1
+    has two distinct <clause eId="schedule-1__clause-30"> elements (see the
+    fixture's header comment). Both must survive in ``sections`` -- silently
+    overwriting the first with the second is permanent content loss."""
+    root = _parse_corpus("sched-dup-eid.xml")
+    ix = build_ref_index(_all_nav_eids(root))
+    sections, counts = build_sections(root, ix)
+
+    assert "schedule-1__clause-30" in sections
+    assert "schedule-1__clause-30~2" in sections
+    assert sections["schedule-1__clause-30"]["html"] != sections["schedule-1__clause-30~2"]["html"]
+    assert "Standard rate" not in sections["schedule-1__clause-30~2"]["html"]
+    assert "June 2000 rate" in sections["schedule-1__clause-30~2"]["heading"]
+    assert counts["disambiguated_eids"] == 1
+
+    # invariant: one bundle key per source clause/unit (clause-30, clause-31,
+    # clause-39, clause-30~2 -- no loose top-level content in this fixture).
+    n_units = len(_schedule_units(
+        next(root.iterfind(f".//{AKN}attachments/{AKN}attachment/{AKN}hcontainer[@name='schedule']"))
+    ))
+    assert n_units == 4
+    assert len([k for k in sections if k.startswith("schedule-1")]) == n_units
+
+
+def test_disambiguated_unit_has_unique_dom_id() -> None:
+    """id-reachability, adjusted to how the reader actually resolves eIds
+    (verified against web/src/views/ReaderView.vue): the DOM id a top-level
+    bundle unit is reached by is `:id="s.eid"` on a wrapper the Vue app
+    renders around `section.html` from the bundle's own dict key -- never an
+    id baked inside `section.html` itself. `render_section`'s "section" kind
+    (what a whole schedule clause/block parses to at the top level, see
+    `parse_section`) never stamps its own eid as an `id=` attribute in the
+    first place (only nested "provision" descendants do, via
+    `HtmlStyleMap._provision`), so there is nothing of the *outer* clause's
+    own eid to rewrite -- `_add_entry`'s ``html.replace`` is a correct,
+    harmless no-op for every unit in this corpus, not a bug. What actually
+    matters, and is checked here, is that a disambiguated unit's *own* nested
+    provisions keep rendering correctly (their ids never collide with the
+    outer clause's eid -- child eids always extend the parent's with a
+    ``__`` segment, so they can't literally equal it) and that the two
+    colliding units' html never cross-contaminate."""
+    root = _parse_corpus("sched-dup-eid.xml")
+    ix = build_ref_index(_all_nav_eids(root))
+    sections, _ = build_sections(root, ix)
+
+    html2 = sections["schedule-1__clause-30~2"]["html"]
+    assert 'id="schedule-1__clause-30__subclause-2"' in html2
+    assert 'id="schedule-1__clause-30"' not in html2
+    assert "Standard rate" not in html2  # not cross-contaminated with unit 1
+    assert "has the same meaning as" in html2
+
+
+def test_build_toc_agrees_with_bundle_on_disambiguated_keys() -> None:
+    """build_toc's schedule-children list must list the same disambiguated
+    keys build_sections actually used for `sections` -- otherwise the TOC and
+    the bundle disagree about what eIds exist."""
+    root = _parse_corpus("sched-dup-eid.xml")
+    ix = build_ref_index(_all_nav_eids(root))
+    sections, _ = build_sections(root, ix)
+
+    toc = build_toc(root)
+    sched_node = next(n for n in toc if n["eid"] == "schedule-1")
+    toc_eids = [c["eid"] for c in sched_node["children"]]
+
+    assert toc_eids == [
+        "schedule-1__clause-30",
+        "schedule-1__clause-31",
+        "schedule-1__clause-39",
+        "schedule-1__clause-30~2",
+    ]
+    assert set(toc_eids) == {k for k in sections if k.startswith("schedule-1")}
+
+
+def test_schedule_unit_count_equals_bundle_key_count() -> None:
+    """Task 3/4 invariant: every unit ``_schedule_units`` yields for a
+    schedule lands under exactly one distinct bundle key. This is the
+    regression guard for a collision silently collapsing two units into one
+    key (proven to fail if ``_add_entry``'s collision branch is removed --
+    see task-4-report.md)."""
+    for fixture in (
+        "sched-clause.xml",
+        "sched-paragraphs.xml",
+        "sched-table.xml",
+        "sched-dup-eid.xml",
+    ):
+        root = _parse_corpus(fixture)
+        ix = build_ref_index(_all_nav_eids(root))
+        sections, _ = build_sections(root, ix)
+        for sched in root.iterfind(
+            f".//{AKN}attachments/{AKN}attachment/{AKN}hcontainer[@name='schedule']"
+        ):
+            sched_eid = sched.get("eId", "")
+            n_units = len(_schedule_units(sched))
+            n_keys = len(
+                [
+                    k
+                    for k in sections
+                    if k == sched_eid or k.startswith(sched_eid + "__")
+                ]
+            )
+            assert n_units == n_keys, f"{fixture}: {n_units} units vs {n_keys} keys"
 
 
 def test_build_sections_skips_sections_without_an_eid() -> None:
