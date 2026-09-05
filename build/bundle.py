@@ -328,11 +328,21 @@ def _toc_node(el: ET._Element) -> dict:
     # sub-containers, so the reader meets the container's introductory text
     # before its first Division/section. Mirrors the ``<eid>__head`` key
     # build_sections writes for the same run.
-    if _local_tag(el) in _HEADNOTE_CONTAINER_TAGS and _headnote_block_children(el):
+    head_eid = el.get("eId", "")
+    if (
+        head_eid
+        and _local_tag(el) in _HEADNOTE_CONTAINER_TAGS
+        and _headnote_block_children(el)
+    ):
+        # `head_eid` truthy mirrors build_sections's head-note pass
+        # (`if not eid: continue`), so an eId-less container never gets a
+        # `{"eid": "__head"}` TOC child the bundle has no entry for -- same
+        # TOC/bundle symmetry convention as build_toc's schedule-clause
+        # `if not eid: continue` (Task 4).
         children.insert(
             0,
             {
-                "eid": f"{el.get('eId', '')}__head",
+                "eid": f"{head_eid}__head",
                 "heading": _headnote_heading(el),
                 "children": [],
             },

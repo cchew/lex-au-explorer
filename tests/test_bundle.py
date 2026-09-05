@@ -513,6 +513,13 @@ def test_chapter_level_content_renders_as_head_entry() -> None:
     sections, _ = build_sections(root, build_ref_index(_all_nav_eids(root)))
     assert "chapter-2__head" in sections
     assert "adducing evidence" in sections["chapter-2__head"]["html"].lower()
+    # Heading format is fixed by the plan: the container's own numbered
+    # heading (<num>2</num> + <heading>Adducing evidence</heading>) plus the
+    # " — introductory text" suffix.
+    assert (
+        sections["chapter-2__head"]["heading"]
+        == "2 Adducing evidence — introductory text"
+    )
     # Task 1 deepcopy discipline: the head-note run is copied into a detached
     # wrapper, never moved -- the source tree is untouched.
     assert ET.tostring(root) == before
@@ -521,6 +528,9 @@ def test_chapter_level_content_renders_as_head_entry() -> None:
     ch2 = _find_toc(toc, "chapter-2")
     assert ch2 is not None
     assert ch2["children"][0]["eid"] == "chapter-2__head"
+    assert (
+        ch2["children"][0]["heading"] == "2 Adducing evidence — introductory text"
+    )
     # The nested <part> children still follow, in document order, after the
     # prepended head-note node.
     assert ch2["children"][1]["eid"] == "chapter-2__part-2.1"
@@ -541,3 +551,48 @@ def test_part_with_only_sections_gets_no_head_entry() -> None:
     assert p22 is not None
     assert all(not c["eid"].endswith("__head") for c in p22["children"])
     assert p22["children"][0]["eid"] == "chapter-2__part-2.2__sec-51"
+
+
+def test_headnote_heading_falls_back_to_bare_suffix_without_num_or_heading() -> None:
+    """A container with direct block content but no <num> and no <heading>
+    gets the bare " introductory text" label -- no leading " — "."""
+    root = ET.fromstring(
+        f'<akomaNtoso xmlns="{AKN[1:-1]}"><act><body>'
+        f'<part eId="part-1">'
+        f"<content><p>This Part applies to transitional matters.</p></content>"
+        f'<section eId="part-1__sec-1"><num>1</num><heading>X</heading>'
+        f"<content><p>body</p></content></section>"
+        f"</part>"
+        f"</body></act></akomaNtoso>"
+    )
+    sections, _ = build_sections(root, build_ref_index(_all_nav_eids(root)))
+    assert sections["part-1__head"]["heading"] == "introductory text"
+
+    toc = build_toc(root)
+    p1 = _find_toc(toc, "part-1")
+    assert p1["children"][0]["eid"] == "part-1__head"
+    assert p1["children"][0]["heading"] == "introductory text"
+
+
+def test_build_toc_skips_headnote_for_eidless_container_like_build_sections() -> None:
+    """Symmetry guard (mirrors build_toc's schedule-clause `if not eid:
+    continue`, Task 4): build_sections's head-note pass skips a container with
+    no eId, so _toc_node must not emit a ``{"eid": "__head"}`` child for one
+    either. Dead today (every corpus structural container has an eId) -- a
+    synthetic regression guard only."""
+    root = ET.fromstring(
+        f'<akomaNtoso xmlns="{AKN[1:-1]}"><act><body>'
+        f"<part>"  # no eId
+        f"<content><p>Head-note prose for an eId-less Part.</p></content>"
+        f'<section eId="s1"><num>1</num><heading>Kept</heading>'
+        f"<content><p>body</p></content></section>"
+        f"</part>"
+        f"</body></act></akomaNtoso>"
+    )
+    sections, _ = build_sections(root, build_ref_index(_all_nav_eids(root)))
+    toc = build_toc(root)
+
+    assert not any(k.endswith("__head") for k in sections)
+    part_node = toc[0]
+    assert part_node["eid"] == ""
+    assert [c["eid"] for c in part_node["children"]] == ["s1"]
