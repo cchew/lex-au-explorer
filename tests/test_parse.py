@@ -6,7 +6,7 @@ from typing import Callable, Optional
 import lxml.etree as ET
 
 from build.ir import Node
-from build.parse import _parse_cell, parse_section
+from build.parse import _parse_cell, _parse_figure, parse_section
 from build.refindex import build_ref_index
 
 NS = 'xmlns="http://docs.oasis-open.org/legaldocml/ns/akn/3.0"'
@@ -353,6 +353,26 @@ def test_figure_yields_figure_node_with_src() -> None:
     assert fig.attrs["src"].endswith("income-tax-assessment-act-1997-fig-2.png")
     assert fig.attrs["alt"] == ""
     assert fig.attrs["asset"] is False
+
+
+def test_parse_figure_lifts_dimensions() -> None:
+    fig = ET.fromstring(
+        f'<figure {NS}><img src="corpus/images/x/x-fig-1.png" '
+        'width="320" height="200"/></figure>'
+    )
+    node = _parse_figure(fig)
+    assert node.attrs["src"].endswith("x-fig-1.png")
+    assert node.attrs["width"] == "320" and node.attrs["height"] == "200"
+
+
+def test_parse_figure_without_dimensions_sets_no_keys() -> None:
+    fig = ET.fromstring(
+        f'<figure {NS}><img src="corpus/images/x/x-fig-1.png"/></figure>'
+    )
+    node = _parse_figure(fig)
+    assert node.attrs["src"].endswith("x-fig-1.png")
+    assert "width" not in node.attrs
+    assert "height" not in node.attrs
 
 
 def test_authorial_note_label_split_off() -> None:

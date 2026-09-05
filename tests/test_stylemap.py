@@ -139,6 +139,36 @@ def test_figure_asset_uses_basename_only() -> None:
     assert out == '<figure><img src="/data/images/diagram.png" alt="Flow"></figure>'
 
 
+def test_figure_renders_dimensions_when_asset_present() -> None:
+    node = Node("figure", {"src": "corpus/images/x/x-fig-1.png",
+                           "width": "320", "height": "200", "asset": True})
+    html = S._figure(node, [])
+    assert 'width="320"' in html and 'height="200"' in html and "<img" in html
+
+
+def test_figure_asset_without_dimensions_emits_no_width_height() -> None:
+    node = Node("figure", {"asset": True, "src": "/x/y/diagram.png", "alt": "Flow"})
+    out = S._figure(node, [])
+    assert out == '<figure><img src="/data/images/diagram.png" alt="Flow"></figure>'
+    assert "width=" not in out and "height=" not in out
+
+
+def test_figure_placeholder_ignores_dimensions() -> None:
+    node = Node("figure", {"asset": False, "src": "d.png", "alt": "Diagram",
+                           "width": "320", "height": "200"})
+    out = S._figure(node, [])
+    assert out == '<figure class="akn-figure-missing">[figure: Diagram]</figure>'
+    assert "width=" not in out and "height=" not in out
+
+
+def test_figure_dimensions_are_escaped() -> None:
+    node = Node("figure", {"asset": True, "src": "d.png", "alt": "",
+                           "width": XSS, "height": XSS})
+    out = S._figure(node, [])
+    assert "<script>" not in out
+    assert 'width="&quot;&gt;&lt;script&gt;' in out
+
+
 def test_figure_missing_falls_back_to_alt_then_src() -> None:
     assert S._figure(Node("figure", {"asset": False, "src": "d.png", "alt": "Diagram"}), []) == \
         '<figure class="akn-figure-missing">[figure: Diagram]</figure>'

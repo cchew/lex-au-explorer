@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "predeploy": "cd .. && .venv/bin/lex-au-explorer-build --corpus-dir ../../lex-au/repo/corpus --graph ../../lex-au-graph/repo/graph.json --out web/public/data",
+    "predeploy": "cd .. && .venv/bin/lex-au-explorer-build --corpus-dir ../../lex-au/repo/corpus --graph ../../lex-au-graph/repo/graph.json --out web/public/data --corpus-images ../../lex-au/repo/corpus/images",
     "build": "vue-tsc --noEmit && vite build",
     "test": "vitest run",
     "test:e2e": "playwright test"

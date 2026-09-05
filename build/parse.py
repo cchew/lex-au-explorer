@@ -293,6 +293,10 @@ def _parse_figure(el: ET._Element) -> Node:
     if img is not None:
         node.attrs["src"] = img.get("src", "") or ""
         node.attrs["alt"] = img.get("alt", "") or ""
+        for dim in ("width", "height"):
+            value = img.get(dim)
+            if value is not None and value != "":
+                node.attrs[dim] = value
     else:
         node.attrs["src"] = ""
         node.attrs["alt"] = ""

@@ -185,9 +185,14 @@ class HtmlStyleMap:
         alt = str(node.attrs.get("alt", "") or "")
         if node.attrs.get("asset"):
             basename = os.path.basename(src)
+            dims = ""
+            for key in ("width", "height"):
+                val = node.attrs.get(key)
+                if val is not None and str(val) != "":
+                    dims += f' {key}="{_esc(val)}"'
             return (
                 f'<figure><img src="/data/images/{_esc(basename)}" '
-                f'alt="{_esc(alt)}"></figure>'
+                f'alt="{_esc(alt)}"{dims}></figure>'
             )
         return (
             f'<figure class="akn-figure-missing">[figure: {_esc(alt or src)}]'
