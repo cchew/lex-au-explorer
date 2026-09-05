@@ -255,6 +255,33 @@ def test_build_toc_agrees_with_bundle_on_disambiguated_keys() -> None:
     assert set(toc_eids) == {k for k in sections if k.startswith("schedule-1")}
 
 
+def test_build_toc_skips_eidless_schedule_clause_like_build_sections_does() -> None:
+    """Review finding (post-approval, Task 4): build_toc's clause branch must
+    skip a schedule <clause> with no eId, exactly like build_sections's
+    clause branch already does (`if not eid: continue` before ever calling
+    _add_entry) -- otherwise the TOC would list a node with no corresponding
+    `sections` entry. Real corpus has 0/151,217 schedule clauses without an
+    eId (reviewer-verified), so this is a synthetic regression guard for a
+    dead-today edge case, not a real-corpus reproduction."""
+    root = ET.fromstring(
+        f'<akomaNtoso xmlns="{AKN[1:-1]}"><act><attachments><attachment>'
+        f'<hcontainer name="schedule" eId="schedule-1"><heading>Sched</heading>'
+        f'<hcontainer name="clause"><num>1</num><heading>No eId</heading>'
+        f"<content><p>orphan clause</p></content></hcontainer>"
+        f'<hcontainer name="clause" eId="schedule-1__clause-2">'
+        f"<num>2</num><heading>Kept</heading>"
+        f"<content><p>real clause</p></content></hcontainer>"
+        f"</hcontainer></attachment></attachments></act></akomaNtoso>"
+    )
+    ix = build_ref_index(_all_nav_eids(root))
+    sections, _ = build_sections(root, ix)
+    toc = build_toc(root)
+
+    assert list(sections) == ["schedule-1__clause-2"]
+    sched_node = next(n for n in toc if n["eid"] == "schedule-1")
+    assert [c["eid"] for c in sched_node["children"]] == ["schedule-1__clause-2"]
+
+
 def test_schedule_unit_count_equals_bundle_key_count() -> None:
     """Task 3/4 invariant: every unit ``_schedule_units`` yields for a
     schedule lands under exactly one distinct bundle key. This is the

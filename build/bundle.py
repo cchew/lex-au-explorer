@@ -124,7 +124,17 @@ def build_toc(root: ET._Element) -> list[dict]:
         for unit in _schedule_units(sched):
             if unit[0] == "clause":
                 clause = unit[1]
-                key = _next_free_key(clause.get("eId", ""), lambda k: k in used)
+                eid = clause.get("eId", "")
+                if not eid:
+                    # Symmetry with build_sections's clause branch (which
+                    # does `if not eid: continue` before ever calling
+                    # _add_entry): a clause with no eId gets no `sections`
+                    # entry there, so it must get no TOC child here either --
+                    # otherwise the TOC would list a node the bundle has no
+                    # content for, breaking the "TOC and bundle never
+                    # disagree" property this task exists to guarantee.
+                    continue
+                key = _next_free_key(eid, lambda k: k in used)
                 used.add(key)
                 children.append(
                     {
