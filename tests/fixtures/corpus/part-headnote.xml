@@ -1,0 +1,91 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<akomaNtoso xmlns="http://docs.oasis-open.org/legaldocml/ns/akn/3.0">
+  <act name="act">
+    <meta>
+      <!-- Trimmed real-corpus fixture (lex-au-explorer Task 7). Source: lex-au/repo/corpus/xml/evidence-act-1995.xml. Kept: full identification block. Body trimmed to chapter eId="chapter-2" only: its own "INTRODUCTORY NOTE" content (direct chapter-level head-note prose, this task's target case), part eId="chapter-2__part-2.1" reduced to one division wrapping one section (chapter-2__part-2.1__dvs-1__sec-12, verbatim), and part eId="chapter-2__part-2.2" reduced to its one smallest section (chapter-2__part-2.2__sec-51, verbatim, with its trailing authorialNote kept). part-2.2 has no direct content/p/blockList/table of its own in the real corpus (only num/heading/section children); kept deliberately as this fixture's regression case (a Part with only section children must get no __head entry/TOC child). All other chapters/parts/divisions/sections of the real Act, and chapter-2's other two parts (2.3, 2.4), dropped. -->
+      <identification source="#lex-au">
+        <FRBRWork>
+          <FRBRthis value="/akn/au/act/1995/2/!main"/>
+          <FRBRuri value="/akn/au/act/1995/2"/>
+          <FRBRdate date="1995-01-01" name="Generation"/>
+          <FRBRauthor href="#parliament"/>
+          <FRBRcountry value="au"/>
+          <FRBRsubtype value="act"/>
+          <FRBRnumber value="2"/>
+          <FRBRname value="evidence-act-1995"/>
+          <FRBRprescriptive value="true"/>
+          <FRBRauthoritative value="true"/>
+        </FRBRWork>
+        <FRBRExpression>
+          <FRBRthis value="/akn/au/act/1995/2/eng@2025-06-10/!main"/>
+          <FRBRuri value="/akn/au/act/1995/2/eng@2025-06-10"/>
+          <FRBRdate date="2025-06-10" name="Generation"/>
+          <FRBRauthor href="#parliament"/>
+          <FRBRlanguage language="eng"/>
+        </FRBRExpression>
+        <FRBRManifestation>
+          <FRBRthis value="/akn/au/act/1995/2/eng@2025-06-10/!main.akn"/>
+          <FRBRuri value="/akn/au/act/1995/2/eng@2025-06-10/!main.akn"/>
+          <FRBRdate date="2026-09-04" name="Generation"/>
+          <FRBRauthor href="#lex-au"/>
+        </FRBRManifestation>
+      </identification>
+    </meta>
+    <body>
+      <chapter eId="chapter-2">
+        <num>2</num>
+        <heading>Adducing evidence</heading>
+        <content>
+          <p>		<i>INTRODUCTORY NOTE</i></p>
+          <p>		<i>Outline of this Chapter </i></p>
+          <p>This Chapter is about ways in which evidence is adduced.</p>
+          <p><ref href="#part-2">Part&#160;2</ref>.1 is about adducing evidence from witnesses.</p>
+          <p><ref href="#part-2">Part&#160;2</ref>.2 is about adducing documentary evidence.</p>
+        </content>
+        <part eId="chapter-2__part-2.1">
+          <num>2.1</num>
+          <heading>Witnesses</heading>
+          <division eId="chapter-2__part-2.1__dvs-1">
+            <num>1</num>
+            <heading>Competence and compellability of witnesses</heading>
+            <section eId="chapter-2__part-2.1__dvs-1__sec-12">
+              <num>12</num>
+              <heading>Competence and compellability</heading>
+              <content>
+                <p>Except as otherwise provided by this Act:</p>
+              </content>
+              <paragraph eId="chapter-2__part-2.1__dvs-1__sec-12__para-a">
+                <num>a</num>
+                <content>
+                  <p>every person is competent to give evidence; and</p>
+                </content>
+              </paragraph>
+              <paragraph eId="chapter-2__part-2.1__dvs-1__sec-12__para-b">
+                <num>b</num>
+                <content>
+                  <p>a person who is competent to give evidence about a fact is compellable to give that evidence.</p>
+                </content>
+              </paragraph>
+            </section>
+          </division>
+        </part>
+        <part eId="chapter-2__part-2.2">
+          <num>2.2</num>
+          <heading>Documentary evidence</heading>
+          <section eId="chapter-2__part-2.2__sec-51">
+            <num>51</num>
+            <heading>Original document rule abolished</heading>
+            <content>
+              <p>The principles and rules of the common law that relate to the means of proving the contents of documents are abolished.</p>
+            </content>
+            <authorialNote placement="end" eId="note-17" marker="17">
+              <content>
+                <p>Note:	Section&#160;182 gives the provisions of this Part a wider application in relation to Commonwealth records and certain Commonwealth documents.</p>
+              </content>
+            </authorialNote>
+          </section>
+        </part>
+      </chapter>
+    </body>
+  </act>
+</akomaNtoso>

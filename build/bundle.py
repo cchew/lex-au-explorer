@@ -33,6 +33,15 @@ _STRUCTURAL_TAGS = {
     "part", "division", "subdivision", "subDivision", "chapter", "section",
 }
 
+# Task 7: containers whose direct block content (outside any ``<section>``) is
+# a head-note -- ``_STRUCTURAL_TAGS`` minus ``section`` (a ``<section>``'s own
+# direct content is rendered by ``build_sections``'s per-section pass, not
+# here). ``_HEADNOTE_BLOCK_TAGS`` is the set of direct children that count as
+# that content; ``<num>``/``<heading>``, nested structural containers,
+# ``<section>`` and ``<authorialNote>`` are all excluded.
+_HEADNOTE_CONTAINER_TAGS = _STRUCTURAL_TAGS - {"section"}
+_HEADNOTE_BLOCK_TAGS = {"content", "p", "blockList", "table"}
+
 # Disambiguator for colliding schedule-unit eIds (Task 4). The converter
 # flattens schedule Part/Division numbering, so a schedule can legitimately
 # contain two distinct <clause> elements sharing one eId (see
@@ -313,6 +322,21 @@ def _toc_node(el: ET._Element) -> dict:
     num_text = (num_el.text or "").strip() if num_el is not None else ""
     heading = f"{num_text} {heading_text}".strip()
     children = [_toc_node(c) for c in el if _local_tag(c) in _STRUCTURAL_TAGS]
+    # Task 7: a part/chapter/division/subdivision/subDivision (never a
+    # <section> -- it renders its own content) with direct head-note block
+    # content gets a synthetic ``__head`` child prepended AHEAD of its nested
+    # sub-containers, so the reader meets the container's introductory text
+    # before its first Division/section. Mirrors the ``<eid>__head`` key
+    # build_sections writes for the same run.
+    if _local_tag(el) in _HEADNOTE_CONTAINER_TAGS and _headnote_block_children(el):
+        children.insert(
+            0,
+            {
+                "eid": f"{el.get('eId', '')}__head",
+                "heading": _headnote_heading(el),
+                "children": [],
+            },
+        )
     return {"eid": el.get("eId", ""), "heading": heading, "children": children}
 
 
@@ -383,6 +407,35 @@ def _entry_heading(el: ET._Element) -> str:
     """Numbered ``<heading>`` text for a schedule clause -- see
     :func:`_numbered_heading`."""
     return _numbered_heading(el)
+
+
+def _headnote_block_children(el: ET._Element) -> list[ET._Element]:
+    """The container's DIRECT ``content``/``p``/``blockList``/``table``
+    children -- the block run that sits outside any ``<section>`` and is the
+    container's head-note (Task 7).
+
+    Direct children only (``for c in el``): a ``<content>`` nested inside an
+    ``<authorialNote>`` or inside a child ``<section>``/``<division>`` is not
+    this container's head-note and is not returned. ``<num>``/``<heading>``
+    and nested structural containers are likewise skipped.
+    """
+    return [c for c in el if _local_tag(c) in _HEADNOTE_BLOCK_TAGS]
+
+
+def _headnote_heading(el: ET._Element) -> str:
+    """Heading for a container's ``__head`` entry (Task 7).
+
+    The container's own numbered heading (:func:`_numbered_heading`, so its
+    ``<num>``/``<heading>`` compose exactly as they do for a body
+    ``<section>`` or a schedule clause) followed by a `` — introductory
+    text`` suffix -- per the plan's
+    ``f"{num} {heading} — introductory text".strip()`` -- marking the entry
+    as the container's pre-section block content rather than a section of its
+    own. When the container has neither ``<num>`` nor ``<heading>`` the
+    suffix stands alone (no leading `` — ``).
+    """
+    base = _numbered_heading(el)
+    return f"{base} — introductory text" if base else "introductory text"
 
 
 def _schedule_label(sched: ET._Element) -> str:
@@ -580,5 +633,38 @@ def build_sections(
                 _key = _add_entry(
                     sections, key, "", render_section(node, active_style), ref_index.tally
                 )
+
+    # Task 7: head-note pass. Block content (content/p/blockList/table) sitting
+    # DIRECTLY inside a <part>/<chapter>/<division>/<subdivision>/<subDivision>,
+    # outside any <section>, is the container's head-note (5,761 such blocks in
+    # the corpus). Render it as one detached <hcontainer> keyed
+    # ``<container eId>__head``. <section> is deliberately not in this tag set
+    # -- a section's own content is already rendered by the pass above. The
+    # corpus has zero part/chapter/division elements inside <attachments>
+    # (verified), so this whole-tree walk can never double-render a schedule's
+    # loose content, which _schedule_units already grouped above.
+    for container in root.iter():
+        if _local_tag(container) not in _HEADNOTE_CONTAINER_TAGS:
+            continue
+        eid = container.get("eId", "")
+        if not eid:
+            continue
+        run = _headnote_block_children(container)
+        if not run:
+            continue
+        # Task 1 BINDING (as the schedule loop above): deepcopy each block
+        # into a detached <hcontainer> -- never move live nodes, which would
+        # empty the container that build_toc also reads from `root`.
+        wrap = ET.Element(f"{AKN}hcontainer")
+        for el in run:
+            wrap.append(copy.deepcopy(el))
+        node = parse_section(wrap, ref_index)
+        _add_entry(
+            sections,
+            f"{eid}__head",
+            _headnote_heading(container),
+            render_section(node, active_style),
+            ref_index.tally,
+        )
 
     return sections, ref_index.tally

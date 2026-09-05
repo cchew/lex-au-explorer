@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import collections
 from pathlib import Path
+from typing import Optional
 
 import lxml.etree as ET
 
@@ -484,3 +485,59 @@ def test_build_preface_none_when_absent() -> None:
         f'<akomaNtoso xmlns="{AKN[1:-1]}"><act><body/></act></akomaNtoso>'
     )
     assert build_preface(root) is None
+
+
+# --------------------------------------------------------------------------- #
+# Part/Chapter/Division head-notes -- Task 7
+# --------------------------------------------------------------------------- #
+
+
+def _find_toc(nodes: list[dict], eid: str) -> Optional[dict]:
+    """Depth-first search of a ``build_toc`` tree for the node with ``eid``."""
+    for n in nodes:
+        if n["eid"] == eid:
+            return n
+        found = _find_toc(n["children"], eid)
+        if found is not None:
+            return found
+    return None
+
+
+def test_chapter_level_content_renders_as_head_entry() -> None:
+    """part-headnote.xml (cut from evidence-act-1995.xml) has a real
+    <chapter>-level "INTRODUCTORY NOTE" <content> block directly under
+    <chapter eId="chapter-2">, before its nested <part> children -- the real
+    corpus shape this task targets."""
+    root = _parse_corpus("part-headnote.xml")
+    before = ET.tostring(root)
+    sections, _ = build_sections(root, build_ref_index(_all_nav_eids(root)))
+    assert "chapter-2__head" in sections
+    assert "adducing evidence" in sections["chapter-2__head"]["html"].lower()
+    # Task 1 deepcopy discipline: the head-note run is copied into a detached
+    # wrapper, never moved -- the source tree is untouched.
+    assert ET.tostring(root) == before
+
+    toc = build_toc(root)
+    ch2 = _find_toc(toc, "chapter-2")
+    assert ch2 is not None
+    assert ch2["children"][0]["eid"] == "chapter-2__head"
+    # The nested <part> children still follow, in document order, after the
+    # prepended head-note node.
+    assert ch2["children"][1]["eid"] == "chapter-2__part-2.1"
+
+
+def test_part_with_only_sections_gets_no_head_entry() -> None:
+    """Regression guard: chapter-2__part-2.2's only direct children are
+    <num>/<heading>/<section> (real corpus shape -- no <content> of its own).
+    It must get no __head bundle entry and no __head TOC child -- a
+    <section>'s own content is handled by build_sections's existing
+    per-section pass, not by this task's head-note pass."""
+    root = _parse_corpus("part-headnote.xml")
+    sections, _ = build_sections(root, build_ref_index(_all_nav_eids(root)))
+    assert "chapter-2__part-2.2__head" not in sections
+
+    toc = build_toc(root)
+    p22 = _find_toc(toc, "chapter-2__part-2.2")
+    assert p22 is not None
+    assert all(not c["eid"].endswith("__head") for c in p22["children"])
+    assert p22["children"][0]["eid"] == "chapter-2__part-2.2__sec-51"
