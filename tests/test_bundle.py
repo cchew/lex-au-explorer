@@ -381,6 +381,50 @@ def test_numbered_heading_does_not_double_a_heading_that_already_has_the_num() -
     assert sections["s1"]["heading"] == "3 Already numbered"
 
 
+def test_numbered_heading_guard_is_word_boundary_aware() -> None:
+    """Real-corpus regression (found in Task 5 post-approval review):
+    veterans'-entitlements-(rewrite)-transition-act-1991.xml's
+    part-4__sec-19 has <num>19</num> and <heading>1990 Budget
+    amendments</heading>. A plain ``heading.startswith(num)`` guard wrongly
+    matches ("1990...".startswith("19") is True) and suppresses the prepend,
+    silently dropping the section's own number. "19" is not a whole token at
+    the start of "1990" (the next character, "9", continues the number), so
+    the guard must not fire here -- the section must still get its "19 "
+    prefix."""
+    root = ET.fromstring(
+        f'<akomaNtoso xmlns="{AKN[1:-1]}"><act><body>'
+        f'<section eId="part-4__sec-19"><num>19</num>'
+        f"<heading>1990 Budget amendments</heading>"
+        f"<content><p>body</p></content></section>"
+        f"</body></act></akomaNtoso>"
+    )
+    sections, _ = build_sections(root, build_ref_index([]))
+    assert sections["part-4__sec-19"]["heading"] == "19 1990 Budget amendments"
+
+
+def test_schedule_label_rejects_scheduled_as_a_false_positive() -> None:
+    """Real-corpus regression (found in Task 5 post-approval review):
+    offshore-petroleum-and-greenhouse-gas-storage-act-2006.xml has a schedule
+    headed "Scheduled areas for the States and Territories". A plain
+    ``heading.startswith("Schedule")`` check wrongly treats this as
+    already-gazette-form (it's a true string prefix) and returns it verbatim
+    with no ordinal at all. "Schedule" is not a whole token at the start of
+    "Scheduled" (the next character, "d", continues the word), so this
+    schedule must still get a synthesised "Schedule N -- " label like any
+    other non-gazette-form schedule."""
+    root = ET.fromstring(
+        f'<akomaNtoso xmlns="{AKN[1:-1]}"><act><attachments><attachment>'
+        f'<hcontainer name="schedule" eId="schedule-1">'
+        f"<heading>Scheduled areas for the States and Territories</heading>"
+        f"<content><p>body</p></content></hcontainer>"
+        f"</attachment></attachments></act></akomaNtoso>"
+    )
+    toc = build_toc(root)
+    assert toc[0]["heading"] == (
+        "Schedule 1 — Scheduled areas for the States and Territories"
+    )
+
+
 def test_build_sections_skips_sections_without_an_eid() -> None:
     root = ET.fromstring(
         f'<akomaNtoso xmlns="{AKN[1:-1]}"><act><body>'

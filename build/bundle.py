@@ -171,6 +171,40 @@ def _toc_node(el: ET._Element) -> dict:
     return {"eid": el.get("eId", ""), "heading": heading, "children": children}
 
 
+def _starts_with_token(text: str, prefix: str) -> bool:
+    """``text`` begins with ``prefix`` as a whole token, not merely as a
+    string prefix -- i.e. ``prefix`` occupies the string up to a genuine
+    word/number boundary, never partway through a longer word or number.
+
+    ``prefix`` must be non-empty. True when ``text.startswith(prefix)`` AND
+    the character immediately following ``prefix`` (if any) is *not*
+    alphanumeric. That excludes NBSP (``\\xa0``, ``str.isalnum()`` is False
+    for it) and ordinary punctuation/space as boundaries, while rejecting a
+    letter or digit that would silently continue ``prefix`` into a different
+    word or number.
+
+    Fixes two real-corpus regressions found in review (post Task 5 approval):
+
+    - ``_schedule_label``'s old ``heading_text.startswith("Schedule")`` also
+      matched "Scheduled areas...", "Scheduled substances" and "Scheduled
+      interests" -- "Schedule" is a true *prefix* of "Scheduled" but not a
+      whole token there ('d' is alphanumeric, so this helper correctly
+      rejects it).
+    - ``_numbered_heading``'s old ``heading_text.startswith(num_text)`` guard
+      fired on ``veterans'-entitlements-(rewrite)-transition-act-1991.xml``'s
+      ``part-4__sec-19`` (``<num>19</num>``, ``<heading>1990 Budget
+      amendments</heading>``): "1990...".startswith("19") is True, so the
+      guard wrongly treated the heading as already-numbered and suppressed
+      the prepend, silently dropping the section's own number. '9' (the
+      character right after "19" in "1990") is alphanumeric, so this helper
+      correctly rejects the match and lets the real prepend happen.
+    """
+    if not text.startswith(prefix):
+        return False
+    rest = text[len(prefix):]
+    return rest == "" or not rest[0].isalnum()
+
+
 def _numbered_heading(el: ET._Element) -> str:
     """``f"{num} {heading}".strip()``, mirroring :func:`_toc_node` (Task 5).
 
@@ -178,19 +212,24 @@ def _numbered_heading(el: ET._Element) -> str:
     ``<section>`` elements (``build_sections``'s first loop), so the two
     never diverge on how a number gets prepended to a heading.
 
-    Guard: if ``heading`` text already starts with the ``num`` text, the
-    heading is returned unprepended -- a source document that has already
-    baked its number into the heading (e.g. ``<heading>3 Already
-    numbered</heading>``) must not get a doubled ``"3 3 Already
-    numbered"``. An empty ``num_text`` never matches this guard's intent
-    (every string "starts with" ""), so it's excluded explicitly to avoid
-    short-circuiting into always-true.
+    Guard: if ``heading`` text already starts with the ``num`` text *as a
+    whole token* (see :func:`_starts_with_token`), the heading is returned
+    unprepended -- a source document that has already baked its number into
+    the heading (e.g. ``<heading>3 Already numbered</heading>``) must not
+    get a doubled ``"3 3 Already numbered"``. Token-boundary matching (not
+    plain ``str.startswith``) is required so a heading that merely begins
+    with a longer number sharing ``num``'s digits (e.g. ``num="19"`` against
+    ``<heading>1990 Budget amendments</heading>``) is not mistaken for
+    already-numbered -- see :func:`_starts_with_token`'s docstring for the
+    real-corpus case this fixes. An empty ``num_text`` never matches this
+    guard's intent (every string "starts with" ""), so it's excluded
+    explicitly to avoid short-circuiting into always-true.
     """
     heading_el = el.find(f"{AKN}heading")
     num_el = el.find(f"{AKN}num")
     heading_text = (heading_el.text or "").strip() if heading_el is not None else ""
     num_text = (num_el.text or "").strip() if num_el is not None else ""
-    if not num_text or heading_text.startswith(num_text):
+    if not num_text or _starts_with_token(heading_text, num_text):
         return heading_text
     return f"{num_text} {heading_text}".strip()
 
@@ -205,9 +244,29 @@ def _schedule_label(sched: ET._Element) -> str:
     """The TOC/bundle label for one ``<hcontainer name="schedule">`` (Task 5).
 
     If the schedule's own ``<heading>`` already reads in gazette form (starts
-    with the literal word "Schedule", e.g. "Schedule 2") it is returned
-    verbatim. Otherwise a synthesised ``"Schedule {ordinal}"`` label is used,
-    with `` — {heading}`` appended when a heading exists.
+    with the whole word "Schedule" -- see :func:`_starts_with_token` -- e.g.
+    "Schedule 2", "Schedule\\xa02", "Schedule I—") it is returned verbatim.
+    Otherwise a synthesised ``"Schedule {ordinal}"`` label is used, with
+    `` — {heading}`` appended when a heading exists.
+
+    Token-boundary matching (not plain ``str.startswith``) is required:
+    a real-corpus review finding (post Task 5 approval) showed plain
+    ``startswith("Schedule")`` also matches "Scheduled areas for the States
+    and Territories", "Scheduled substances" and "Scheduled interests" --
+    "Schedule" is a string prefix of "Scheduled" but not the whole first
+    word, so those three must fall through to the synthesised-ordinal
+    branch, not be returned as if already gazette-form. Verified against all
+    22 corpus schedules whose heading starts with "Schedule": 18 are true
+    ``"Schedule\\xa0N"`` / ``"Schedule I—"`` gazette form (still accepted),
+    3 are the "Scheduled ..." false positives above (now correctly
+    rejected), and one -- "Schedule to be inserted in Parliament Act 1974"
+    (parliamentary-precincts-act-1988) -- is a literal heading that begins
+    with the standalone word "Schedule" but carries no schedule number.
+    Judgment call: this one is still accepted (space is a valid boundary
+    character after "Schedule"), since the alternative would render as
+    "Schedule 1 — Schedule to be inserted in Parliament Act 1974" (that Act
+    has one schedule) -- a worse, doubled-"Schedule" result than the
+    original heading shown verbatim.
 
     ``ordinal`` is the schedule's 1-based position among *all* schedules in
     the document (every ``hcontainer[@name='schedule']`` reachable via
@@ -223,7 +282,7 @@ def _schedule_label(sched: ET._Element) -> str:
     """
     heading_el = sched.find(f"{AKN}heading")
     heading_text = (heading_el.text or "").strip() if heading_el is not None else ""
-    if heading_text.startswith("Schedule"):
+    if _starts_with_token(heading_text, "Schedule"):
         return heading_text
     root = sched.getroottree().getroot()
     schedules = list(
