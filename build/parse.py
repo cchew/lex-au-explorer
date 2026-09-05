@@ -279,9 +279,11 @@ def _parse_cell(c: ET._Element) -> Node:
         value = c.get(attr)
         if value is not None and value.isdigit():
             cell.attrs[attr] = value
-    text = _normalise_ws("".join(c.itertext()))
-    if text:
-        cell.children.append(Node("text", text=text))
+    raw = "".join(c.itertext())
+    lines = [x for x in (_normalise_ws(p) for p in raw.split("\n")) if x]
+    cell.attrs["lines"] = lines
+    if lines:
+        cell.children.append(Node("text", text=" ".join(lines)))
     return cell
 
 

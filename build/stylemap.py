@@ -169,7 +169,12 @@ class HtmlStyleMap:
             value = node.attrs.get(attr)
             if value is not None and str(value) != "":
                 span_attrs += f' {attr}="{_esc(value)}"'
-        return f"<{tag}{span_attrs}>{''.join(children)}</{tag}>"
+        lines = node.attrs.get("lines")
+        if lines:
+            content = "<br>".join(_esc(x) for x in lines)
+        else:
+            content = "".join(children)
+        return f"<{tag}{span_attrs}>{content}</{tag}>"
 
     # ------------------------------------------------------------------ #
     # Figures

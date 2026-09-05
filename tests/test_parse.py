@@ -6,7 +6,7 @@ from typing import Callable, Optional
 import lxml.etree as ET
 
 from build.ir import Node
-from build.parse import parse_section
+from build.parse import _parse_cell, parse_section
 from build.refindex import build_ref_index
 
 NS = 'xmlns="http://docs.oasis-open.org/legaldocml/ns/akn/3.0"'
@@ -333,6 +333,15 @@ def test_table_cell_colspan_copied_only_when_digit() -> None:
     assert row.children[0].attrs["colspan"] == "2"
     assert "colspan" not in row.children[1].attrs
     assert "colspan" not in row.children[2].attrs
+
+
+def test_parse_cell_keeps_newline_as_lines() -> None:
+    cell = ET.fromstring(f"<td {NS}>Column 1\nBasic amount</td>")
+    node = _parse_cell(cell)
+    assert node.attrs["lines"] == ["Column 1", "Basic amount"]
+    # The single joined text child is retained (no tabs, no double spaces).
+    assert len(node.children) == 1 and node.children[0].kind == "text"
+    assert node.children[0].text == "Column 1 Basic amount"
 
 
 def test_figure_yields_figure_node_with_src() -> None:

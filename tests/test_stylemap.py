@@ -159,6 +159,26 @@ def test_cell_colspan_rowspan_when_present() -> None:
     assert S._cell(Node("cell", {"td": False}), ["h"]) == "<th>h</th>"
 
 
+def test_cell_renders_br_between_lines() -> None:
+    node = Node("cell", {"td": True, "lines": ["Column 1", "Basic amount"]})
+    assert S._cell(node, []) == "<td>Column 1<br>Basic amount</td>"
+
+
+def test_cell_escapes_then_breaks() -> None:
+    node = Node("cell", {"td": True, "lines": ["<script>", "x"]})
+    assert S._cell(node, []) == "<td>&lt;script&gt;<br>x</td>"
+
+
+def test_single_line_cell_no_br() -> None:
+    node = Node("cell", {"td": True, "lines": ["Just one"]})
+    assert S._cell(node, []) == "<td>Just one</td>"
+
+
+def test_cell_colspan_survives_multiline_lines() -> None:
+    node = Node("cell", {"td": True, "colspan": "2", "lines": ["a", "b"]})
+    assert S._cell(node, []) == '<td colspan="2">a<br>b</td>'
+
+
 def test_table_without_header_row_is_all_tbody() -> None:
     n = Node("table", children=[
         Node("row", children=[Node("cell", {"td": True}, [Node("text", text="a")])]),
