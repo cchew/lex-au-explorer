@@ -18,7 +18,7 @@ const MOCK_BUNDLE = {
   toc: [{ eid: "part-I", heading: "Part 1", children: [{ eid: "part-I__sec-6", heading: "Definitions", children: [] }] }],
   sections: { "part-I__sec-6": { heading: "Definitions", html: "<p>Test</p>" } },
   definitions: {},
-  raw_xml_url: "/data/privacy-act-1988.xml",
+  raw_xml_url: "https://huggingface.co/datasets/cchew/lex-au/resolve/main/xml/privacy-act-1988.xml",
   split_by_part: false,
 };
 
@@ -35,7 +35,7 @@ const MOCK_SPLIT_INDEX_BUNDLE = {
   toc: [{ eid: "part-I", heading: "Part 1", children: [{ eid: "part-I__sec-6", heading: "Definitions", children: [] }] }],
   sections: {},
   definitions: {},
-  raw_xml_url: "/data/fair-work-act-2009.xml",
+  raw_xml_url: "https://huggingface.co/datasets/cchew/lex-au/resolve/main/xml/fair-work-act-2009.xml",
   split_by_part: true,
 };
 
@@ -80,7 +80,7 @@ const MOCK_SPLIT_SCHEDULES_BUNDLE = {
   ],
   sections: { "part-1__sec-1": { heading: "Short title", html: "<p>Body provision</p>" } },
   definitions: {},
-  raw_xml_url: "/data/corporations-act-2001.xml",
+  raw_xml_url: "https://huggingface.co/datasets/cchew/lex-au/resolve/main/xml/corporations-act-2001.xml",
   split_by_part: false,
   split_schedules: true,
 };
@@ -284,7 +284,11 @@ describe("ReaderView", () => {
     expect(wrapper.find(".load-error").exists()).toBe(false);
   });
 
-  it("shows an error and falls back to ActSearch when the Part fetch fails", async () => {
+  it("keeps the reader mounted (does not eject to search) when the initial Part fetch fails", async () => {
+    // F3: lazy Part fetch is on the primary nav path now. A failed fetch must
+    // surface an error line but leave `bundle` mounted -- not null it and dump
+    // the user back to ActSearch. This test used to assert the opposite
+    // (fall-back-to-search) behaviour.
     vi.stubGlobal("fetch", vi.fn(async (url: string): Promise<MockResponse> => {
       if (url.includes("index.json")) {
         return jsonResponse(MOCK_SPLIT_INDEX);
@@ -319,11 +323,62 @@ describe("ReaderView", () => {
     await wrapper.vm.$nextTick();
     await wrapper.vm.$nextTick();
 
+    const vm = wrapper.vm as unknown as ReaderVm;
     expect(wrapper.find(".load-error").exists()).toBe(true);
-    expect(wrapper.text()).toContain("HTTP 404");
-    // No half-rendered reader shell: back to ActSearch, no TOC/content pane
-    expect(wrapper.find(".reader-layout").exists()).toBe(false);
-    expect(wrapper.find(".shortcut-btn").exists()).toBe(true);
+    expect(wrapper.text()).toContain("Couldn't load that section");
+    expect(wrapper.text()).not.toContain("HTTP 404");
+    // Reader shell stays up (TOC + content pane); bundle is not nulled.
+    expect(wrapper.find(".reader-layout").exists()).toBe(true);
+    expect(vm.bundle).not.toBeNull();
+    expect(wrapper.find(".shortcut-btn").exists()).toBe(false);
+  });
+
+  it("preserves already-merged Part sections when a later Part fetch fails", async () => {
+    // F3: navigate into Part I (succeeds), then into Part II (fetch fails).
+    // The error shows, but Part I's merged sections and the reader survive.
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url.includes("index.json")) return jsonResponse(MOCK_SPLIT_INDEX);
+      if (url.includes("/fair-work-act-2009/part-I.json")) return jsonResponse(MOCK_SPLIT_PART_BUNDLE);
+      if (url.includes("/fair-work-act-2009/part-II.json")) return htmlResponse(); // SPA shell -> HTTP 404
+      return jsonResponse(MOCK_SPLIT_INDEX_BUNDLE_TWO_PARTS);
+    }));
+
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: "/reader", component: ReaderView }],
+    });
+    router.push("/reader");
+    await router.isReady();
+
+    const wrapper = mount(ReaderView, { global: { plugins: [router] } });
+    await new Promise((r) => setTimeout(r, 10));
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+
+    await wrapper.find(".shortcut-btn").trigger("click");
+    await new Promise((r) => setTimeout(r, 10));
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+    await new Promise((r) => setTimeout(r, 10));
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+
+    const vm = wrapper.vm as unknown as ReaderVm;
+    expect(vm.bundle?.sections["part-I__sec-6"]).toBeDefined();
+
+    const partIILeaf = wrapper.findAll(".toc-leaf").find((b) => b.text() === "Enforcement");
+    expect(partIILeaf).toBeTruthy();
+    await partIILeaf!.trigger("click");
+    await new Promise((r) => setTimeout(r, 10));
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find(".load-error").exists()).toBe(true);
+    expect(wrapper.text()).toContain("Couldn't load that section");
+    expect(vm.bundle).not.toBeNull();
+    expect(vm.bundle?.sections["part-I__sec-6"]).toBeDefined();
+    expect(wrapper.find(".reader-layout").exists()).toBe(true);
   });
 
   it("shows HTTP 404 when the response is an SPA-fallback HTML shell, not a real 404 status", async () => {

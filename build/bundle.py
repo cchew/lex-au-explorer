@@ -51,6 +51,19 @@ _HEADNOTE_BLOCK_TAGS = {"content", "p", "blockList", "table"}
 # safe HTML `id` attribute character and dict key.
 _EID_DISAMBIG = "~"
 
+# Label for a synthetic schedule "block" unit -- a run of loose siblings
+# (paragraph / table / content / p) that ``_schedule_units`` groups between (or
+# before / after) real ``<clause>`` elements. These have no ``<num>``/
+# ``<heading>`` of their own, so before this they reached the TOC (and the
+# bundle) with ``heading == ""``, which ``ActToc.vue`` renders as an empty
+# clickable row (4,188 blank rows across 1,672 Acts). One consistent short
+# label is applied for every block unit, whether it keys under the bare
+# ``schedule-N`` eId (a no-clause schedule's single whole-schedule run) or
+# ``schedule-N__block-<n>`` (a leading / between-clause / trailing run). The
+# same string is written in BOTH ``build_toc`` and ``build_sections`` so the
+# TOC child and the bundle entry always agree.
+_SCHEDULE_BLOCK_LABEL = "Introductory text"
+
 __all__ = [
     "AKN", "AKN_NS", "build_toc", "build_sections", "build_preface", "_local_tag",
 ]
@@ -139,6 +152,7 @@ def build_toc(root: ET._Element) -> list[dict]:
     for sched in root.iterfind(
         f".//{AKN}attachments/{AKN}attachment/{AKN}hcontainer[@name='schedule']"
     ):
+        sched_eid = sched.get("eId", "")
         children: list[dict] = []
         # Task 4: mirror _add_entry's disambiguation (against a per-schedule
         # set instead of the `sections` dict, which build_toc never sees) so
@@ -170,13 +184,27 @@ def build_toc(root: ET._Element) -> list[dict]:
                 _, raw_key, _run = unit
                 key = _next_free_key(raw_key, lambda k: k in used)
                 used.add(key)
-                # Synthetic (loose-prose) units have no <num>/<heading> of
-                # their own; they stay unlabelled (Task 5 numbers clauses
-                # and body sections only, not these).
-                children.append({"eid": key, "heading": "", "children": []})
+                # A no-clause schedule's single whole-schedule run keys under
+                # the bare schedule eId (see ``_schedule_units``). That would
+                # make a TOC child whose ``eid`` is identical to its parent
+                # schedule node's -- a redundant, self-referential nav row
+                # (361 such cases in the corpus) and an ambiguous
+                # ``getElementById`` target. The schedule node itself already
+                # navigates there (the reader's ``flattenLeafEids`` falls back
+                # to ``[node.eid]`` for a childless node), and
+                # ``build_sections`` still writes the bundle entry under this
+                # key, so suppress only the duplicate child row.
+                if key == sched_eid:
+                    continue
+                # Synthetic (loose-prose) block units have no <num>/<heading>
+                # of their own; give them one consistent short label so the
+                # reader never renders a blank clickable TOC row.
+                children.append(
+                    {"eid": key, "heading": _SCHEDULE_BLOCK_LABEL, "children": []}
+                )
         out.append(
             {
-                "eid": sched.get("eId", ""),
+                "eid": sched_eid,
                 "heading": _schedule_label(sched),
                 "children": children,
             }
@@ -539,20 +567,24 @@ def _add_entry(
     silently overwrite the earlier entry, permanently losing its content.
 
     On collision the returned key is ``f"{eid}{_EID_DISAMBIG}{n}"`` (n >= 2,
-    ``counts["disambiguated_eids"]`` incremented once per collision) and the
-    first ``id="{eid}"`` occurrence in ``html`` -- ``render_section`` /
-    ``HtmlStyleMap`` always stamp the *original* eid, since ``parse_section``
-    has no eid-override hook -- is rewritten to ``id="{key}"`` so
-    ``getElementById`` / ``data-eid`` navigation reaches the disambiguated
-    unit rather than the first (differently-keyed) one.
+    ``counts["disambiguated_eids"]`` incremented once per collision).
 
-    Note: this is a collision axis distinct from -- and not addressed by --
-    the duplicate `id=` attributes that can appear *within* one already
-    -rendered clause's html (repeated `para-a`/`para-b` siblings sharing an
-    eId inside a single clause, e.g. sched-clause.xml's
-    schedule-1__clause-70-20); that is baked in by parse.py/stylemap.py before
-    `_add_entry` ever sees the html string, so it is out of this function's
-    reach (Task 4 report).
+    The ``html.replace(f'id="{eid}"', ...)`` line below is **provably inert for
+    every top-level unit in this corpus today**, and is kept only defensively.
+    Task 4's verified ruling (progress.md): ``render_section`` /
+    ``HtmlStyleMap._provision`` stamp an ``id=`` for *nested provision*
+    descendants only -- a top-level ``section``-kind unit (what a whole schedule
+    clause / block parses to) never emits its own eId as an ``id=`` attribute,
+    and a nested provision's eId always carries an extra ``__`` segment so it
+    can never literally equal ``eid``. There is therefore no ``id="{eid}"``
+    substring in ``html`` for the replace to hit.
+
+    The other collision axis -- duplicate ``id=`` attributes *within* one
+    rendered clause (repeated ``para-a`` / ``para-b`` siblings sharing an eId
+    inside a single clause, e.g. sched-clause.xml's ``schedule-1__clause-70-20``)
+    -- is now handled upstream by :func:`build.parse._dedupe_eids`, which
+    suffixes the repeats in the Node tree before ``render_section`` runs, so
+    ``_add_entry`` never sees a within-unit duplicate either.
     """
     key = _next_free_key(eid, lambda k: k in sections)
     if key != eid:
@@ -637,11 +669,17 @@ def build_sections(
                 for el in run:
                     wrap.append(copy.deepcopy(el))
                 node = parse_section(wrap, ref_index)
-                # Synthetic (loose-prose) units have no <num>/<heading> of
-                # their own -- Task 5's numbered-heading composition does not
-                # apply to them; they stay unlabelled.
+                # Synthetic (loose-prose) block units have no <num>/<heading>
+                # of their own -- Task 5's numbered-heading composition does
+                # not apply. They carry one consistent short label
+                # (_SCHEDULE_BLOCK_LABEL), the SAME string build_toc's block
+                # branch writes, so the TOC child and this bundle entry agree.
                 _key = _add_entry(
-                    sections, key, "", render_section(node, active_style), ref_index.tally
+                    sections,
+                    key,
+                    _SCHEDULE_BLOCK_LABEL,
+                    render_section(node, active_style),
+                    ref_index.tally,
                 )
 
     # Task 7: head-note pass. Block content (content/p/blockList/table) sitting

@@ -82,5 +82,9 @@ Schedule 3A to the *Telecommunications Act 1997*;
   detached `<hcontainer>` and parsed/rendered as a single bundle entry keyed by
   the bare `schedule-1` eId (not `schedule-1__block-0`), per the
   `had_clause or block_n > 0` rule with `had_clause=False` and `block_n=0`.
-- `build_toc`'s schedule node for this fixture has exactly one child: `{"eid":
-  "schedule-1", "heading": "", "children": []}`.
+- `build_toc`'s schedule node for this fixture has **no** children: the single
+  whole-schedule run keys under the bare `schedule-1` eId, which is identical to
+  the schedule node's own eId, so that self-referential child row is suppressed
+  (F2, final-review wave). The content is still bundled under
+  `sections["schedule-1"]`; the reader's `flattenLeafEids` falls back to
+  `[node.eid]` for a childless node, so it still renders.

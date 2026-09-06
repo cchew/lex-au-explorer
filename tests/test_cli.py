@@ -184,7 +184,7 @@ def test_write_split_bundle_writes_one_file_per_part_plus_index(tmp_path):
         "toc": toc,
         "sections": sections,
         "definitions": definitions,
-        "raw_xml_url": "/data/big-act.xml",
+        "raw_xml_url": "https://huggingface.co/datasets/cchew/lex-au/resolve/main/xml/big-act.xml",
         "split_by_part": True,
     }
 
@@ -486,6 +486,69 @@ def test_collect_section_eids_keeps_schedule_clauses():
         {"eid": "schedule-1__clause-2__subclause-1", "children": []}]}
     assert _collect_section_eids(node) == {
         "schedule-1", "schedule-1__clause-2", "schedule-1__clause-2__subclause-1"}
+
+
+def test_collect_section_eids_keeps_container_head_notes():
+    """F1 regression: a Part/Chapter/Division head-note entry
+    (``<container eId>__head``, Task 7 / spec B5) is a real bundle key and must
+    be collected into its owning Part file for split-by-part Acts. Its last
+    ``__``-segment is the bare literal ``head``, which matches none of the
+    _KEEP_LAST_SEGMENT_PREFIXES, so before the ``endswith("__head")`` clause
+    every such entry was silently dropped from every split Act (1,232 corpus
+    entries + as many dead TOC nodes)."""
+    node = {
+        "eid": "part-2",
+        "children": [
+            {"eid": "part-2__head", "children": []},
+            {
+                "eid": "part-2__div-1",
+                "children": [
+                    {"eid": "part-2__div-1__head", "children": []},
+                    {"eid": "part-2__div-1__sec-5", "children": []},
+                ],
+            },
+        ],
+    }
+    assert _collect_section_eids(node) == {
+        "part-2__head",
+        "part-2__div-1__head",
+        "part-2__div-1__sec-5",
+    }
+    # A future ``heading-*`` segment must NOT be swept in by the same clause.
+    assert _collect_section_eids(
+        {"eid": "part-2__heading-note", "children": []}
+    ) == set()
+
+
+def test_write_split_bundle_routes_head_note_into_its_part_file(tmp_path):
+    """F1 end-to-end: a container head-note key present in ``sections`` lands in
+    the right per-Part file (it is reached only via ``_collect_section_eids``)."""
+    toc = [
+        {
+            "eid": "part-I",
+            "heading": "Part I",
+            "children": [
+                {"eid": "part-I__head", "heading": "Part I — introductory text",
+                 "children": []},
+                {"eid": "part-I__sec-1", "heading": "sec 1", "children": []},
+            ],
+        }
+    ]
+    sections = {
+        "part-I__head": {"heading": "Part I — introductory text",
+                         "html": "<p>head-note prose</p>"},
+        "part-I__sec-1": {"heading": "sec 1", "html": "<p>one</p>"},
+    }
+    bundle_meta = {"title": "Big Act", "split_by_part": True, "toc": toc,
+                   "sections": sections, "definitions": {}}
+    out_dir = tmp_path / "data"
+    out_dir.mkdir()
+
+    _write_split_bundle(out_dir, "big-act", toc, sections, {}, bundle_meta)
+
+    part_i = json.loads((out_dir / "big-act" / "part-I.json").read_text())
+    assert set(part_i["sections"]) == {"part-I__head", "part-I__sec-1"}
+    assert part_i["sections"]["part-I__head"]["html"] == "<p>head-note prose</p>"
 
 
 def test_split_by_part_act_writes_schedule_file(tmp_path, monkeypatch):

@@ -29,7 +29,7 @@ from typing import Optional
 
 import lxml.etree as ET
 
-from build.bundle import AKN, _local_tag
+from build.bundle import AKN, _EID_DISAMBIG, _local_tag
 from build.ir import Node
 from build.refindex import RefIndex
 
@@ -78,7 +78,63 @@ def parse_section(section_el: ET._Element, ref_index: RefIndex) -> Node:
         parsed = _parse_block(child, section_eid, ref_index)
         if parsed is not None:
             node.children.append(parsed)
+    _dedupe_eids(node)
     return node
+
+
+def _dedupe_eids(root: Node) -> None:
+    """Rewrite any ``attrs["eid"]`` that repeats *within this one section's*
+    Node tree, so :func:`build.render.render_section`
+    (:meth:`build.stylemap.HtmlStyleMap._provision`) can never emit two
+    elements carrying the same ``id=`` attribute.
+
+    The lex-au converter flattens schedule Part/Division numbering, so a
+    single rendered clause unit can hold several sibling ``<paragraph>``
+    provisions that share an eId (``para-a`` / ``para-b`` repeated one level
+    below the clause -- e.g. ``sched-clause.xml``'s ``clause-70-20``). The
+    same shape occurs in ~8,967 plain body sections. Left alone, both render
+    to duplicate ``id=`` attributes: invalid HTML and a non-deterministic
+    ``getElementById`` target for in-app cross-reference navigation.
+
+    Post-order walk. The first occurrence of an eid (in document order) keeps
+    it bare; each later duplicate is rewritten to
+    ``f"{eid}{_EID_DISAMBIG}{n}"`` for the smallest free ``n`` >= 2 -- the
+    same suffix scheme :func:`build.bundle._next_free_key` applies to
+    colliding bundle keys, so the two disambiguation axes agree on notation.
+    ``root``'s own eid is reserved up front and ``root`` itself is never
+    rewritten: a pathological descendant sharing the unit's own eId must not
+    be able to displace it.
+
+    This only touches ``id=`` anchors. ``ref`` ``target_eid`` / ``data-eid``
+    values come from ``ref_index`` (built from the source XML's ``eId``
+    attributes), not from this tree, so cross-reference resolution is
+    unaffected -- an unscoped ``#para-a`` ref keeps resolving exactly as
+    before.
+    """
+    seen: set[str] = set()
+    root_eid = root.attrs.get("eid")
+    if root_eid:
+        seen.add(root_eid)
+
+    def visit(node: Node) -> None:
+        for child in node.children:
+            visit(child)
+        if node is root:
+            return
+        eid = node.attrs.get("eid")
+        if not eid:
+            return
+        if eid not in seen:
+            seen.add(eid)
+            return
+        n = 2
+        while f"{eid}{_EID_DISAMBIG}{n}" in seen:
+            n += 1
+        disambiguated = f"{eid}{_EID_DISAMBIG}{n}"
+        node.attrs["eid"] = disambiguated
+        seen.add(disambiguated)
+
+    visit(root)
 
 
 # --------------------------------------------------------------------------- #

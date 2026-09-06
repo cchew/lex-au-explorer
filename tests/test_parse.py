@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -8,6 +9,8 @@ import lxml.etree as ET
 from build.ir import Node
 from build.parse import _parse_cell, _parse_figure, parse_section
 from build.refindex import build_ref_index
+from build.render import render_section
+from build.stylemap import HtmlStyleMap
 
 NS = 'xmlns="http://docs.oasis-open.org/legaldocml/ns/akn/3.0"'
 AKN = "{http://docs.oasis-open.org/legaldocml/ns/akn/3.0}"
@@ -241,6 +244,64 @@ def test_schedule_clause_keeps_number() -> None:
         lambda n: n.kind == "provision" and n.attrs.get("level") == "paragraph",
     )
     assert para is not None
+
+
+def test_dedupe_eids_suffixes_repeated_sibling_provision_within_a_clause() -> None:
+    """F4 / spec B2: the converter flattens schedule Part/Division numbering,
+    so sched-clause.xml's `schedule-1__clause-70-20` holds TWO `para-a` and
+    TWO `para-b` sibling <paragraph> provisions sharing an eId. parse_section's
+    post-order de-dup pass keeps the first bare and suffixes the second `~2`,
+    so render_section emits two distinct `id=` values instead of a duplicate."""
+    root = _load("sched-clause.xml")
+    clause = root.find(f".//{AKN}hcontainer[@name='clause']")
+    assert clause is not None
+    node = parse_section(clause, build_ref_index(_nav(root)))
+
+    para_a = _find_all(
+        node,
+        lambda n: n.kind == "provision"
+        and str(n.attrs.get("eid", "")).startswith("schedule-1__clause-70-20__para-a"),
+    )
+    assert [p.attrs["eid"] for p in para_a] == [
+        "schedule-1__clause-70-20__para-a",
+        "schedule-1__clause-70-20__para-a~2",
+    ]
+    para_b = _find_all(
+        node,
+        lambda n: n.kind == "provision"
+        and str(n.attrs.get("eid", "")).startswith("schedule-1__clause-70-20__para-b"),
+    )
+    assert [p.attrs["eid"] for p in para_b] == [
+        "schedule-1__clause-70-20__para-b",
+        "schedule-1__clause-70-20__para-b~2",
+    ]
+
+    html = render_section(node, HtmlStyleMap())
+    assert html.count('id="schedule-1__clause-70-20__para-a"') == 1
+    assert html.count('id="schedule-1__clause-70-20__para-a~2"') == 1
+    assert html.count('id="schedule-1__clause-70-20__para-b~2"') == 1
+    # No id= value appears twice anywhere in the rendered unit.
+    ids = re.findall(r'id="([^"]+)"', html)
+    assert len(ids) == len(set(ids)), f"duplicate id= in render: {ids}"
+
+
+def test_dedupe_eids_leaves_a_clean_tree_untouched() -> None:
+    """No repeated eId -> every provision keeps its bare eId (no spurious ~2)."""
+    node = parse_section(
+        _sec(
+            '<subsection eId="s1__subsec-1"><num>1</num>'
+            '<paragraph eId="s1__subsec-1__para-a"><num>a</num>'
+            "<content><p>first</p></content></paragraph>"
+            '<paragraph eId="s1__subsec-1__para-b"><num>b</num>'
+            "<content><p>second</p></content></paragraph>"
+            "</subsection>"
+        ),
+        build_ref_index([]),
+    )
+    eids = [
+        n.attrs["eid"] for n in _walk(node) if "eid" in n.attrs
+    ]
+    assert eids == ["s1", "s1__subsec-1", "s1__subsec-1__para-a", "s1__subsec-1__para-b"]
 
 
 # --------------------------------------------------------------------------- #

@@ -321,8 +321,17 @@ def _is_schedule_key(k: str) -> bool:
 
 def _collect_section_eids(toc_node: dict) -> set[str]:
     eid = toc_node["eid"]
-    keep = eid.split("__")[-1].startswith(_KEEP_LAST_SEGMENT_PREFIXES) or (
-        "__" not in eid and eid.startswith("schedule-")
+    keep = (
+        eid.split("__")[-1].startswith(_KEEP_LAST_SEGMENT_PREFIXES)
+        # Task 7 container head-notes: ``<container eId>__head`` bundle keys
+        # (Part/Chapter/Division introductory text). ``split(__)[-1]`` is the
+        # bare literal ``head``, which no prefix in _KEEP_LAST_SEGMENT_PREFIXES
+        # matches, so without this clause every ``__head`` entry is dropped
+        # from every split-by-part Act (1,232 lost entries in the corpus).
+        # Matched with an explicit ``endswith`` rather than by adding "head"
+        # to the prefix tuple so a future ``heading-*`` segment cannot match.
+        or eid.endswith("__head")
+        or ("__" not in eid and eid.startswith("schedule-"))
     )
     eids = {eid} if keep else set()
     for child in toc_node.get("children", []):

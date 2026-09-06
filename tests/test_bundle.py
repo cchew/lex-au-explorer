@@ -158,7 +158,35 @@ def test_paragraph_only_schedule_items_render() -> None:
     sections, _ = build_sections(root, ix)
     blob = " ".join(v["html"] for k, v in sections.items() if k.startswith("schedule-1"))
     assert "Coal Industry Act 1946" in blob  # an item's text
-    assert build_toc(root)[-1]["children"]  # schedule node has unit children
+    # sched-paragraphs has no <clause>: its whole loose <paragraph> run is one
+    # synthetic block unit keyed under the bare `schedule-1` eId. That equals
+    # the schedule TOC node's own eid, so the self-referential child row is
+    # suppressed (F2); the content still lands in the bundle under `schedule-1`
+    # and the reader's flattenLeafEids falls back to [node.eid] to render it.
+    sched_node = build_toc(root)[-1]
+    assert sched_node["eid"] == "schedule-1"
+    assert sched_node["children"] == []
+    assert "schedule-1" in sections
+
+
+def test_schedule_block_unit_labelled_and_toc_matches_bundle() -> None:
+    """F2: a synthetic schedule "block" unit (a loose sibling run grouped by
+    _schedule_units) must carry a real label, not "", in BOTH the TOC child
+    and the bundle entry -- and the two strings must be identical. sched-clause
+    has a leading <content> run before its one <clause>, so it produces a
+    `schedule-1__block-0` unit."""
+    root = _parse_corpus("sched-clause.xml")
+    ix = build_ref_index(_all_nav_eids(root))
+    sections, _ = build_sections(root, ix)
+
+    sched_node = next(n for n in build_toc(root) if n["eid"] == "schedule-1")
+    block_children = [c for c in sched_node["children"] if "__block-" in c["eid"]]
+    assert block_children, "expected a synthetic block-unit TOC child"
+    for child in block_children:
+        assert child["heading"] == "Introductory text"
+        assert child["heading"] != ""
+        # TOC child heading and bundle entry heading must agree (F2 parity).
+        assert sections[child["eid"]]["heading"] == child["heading"]
 
 
 def test_schedule_level_table_renders_rows() -> None:

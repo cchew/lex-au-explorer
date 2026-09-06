@@ -24,7 +24,7 @@ const loadedGroups = ref<Set<string>>(new Set());
 // Fetch + parse a JSON bundle, distinguishing "not found" from "malformed."
 //
 // Vite's dev server (and, in production, Netlify's SPA catch-all redirect —
-// see netlify.toml, added in Task 14) returns a 200 with the index.html shell
+// see netlify.toml) returns a 200 with the index.html shell
 // for any path that doesn't match a real file, including missing /data/*.json
 // fixtures. That means `res.ok` is true and `res.json()` fails on the HTML,
 // which looks identical to a genuinely corrupt JSON file unless we check
@@ -90,9 +90,16 @@ async function loadPart(slug: string, partEid: string) {
     // Reassign (not a bare `.add`) so Vue reactivity fires on the ref.
     loadedGroups.value = new Set(loadedGroups.value).add(partEid);
     activeTopLevelEid.value = partEid;
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : "Failed to load Act";
-    bundle.value = null;
+  } catch {
+    // Lazy Part/Schedule fetch is now on the PRIMARY nav path for ~50 Acts
+    // (split_by_part + split_schedules). A transient failure on one multi-MB
+    // section file must NOT eject the reader: surface an error line but keep
+    // `bundle.value` (and every Part already merged into it) mounted and
+    // usable. Nulling it here would drop the user back to the search box and
+    // lose all accumulated state. `selectAct`'s own catch still nulls bundle
+    // for the initial load -- correct, there is no bundle to preserve there.
+    error.value =
+      "Couldn't load that section — check your connection and try again.";
   }
 }
 
