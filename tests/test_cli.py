@@ -545,6 +545,27 @@ def test_schedule_under_threshold_stays_inline(tmp_path):
     assert not (out_dir / "split-sched-act").exists()  # no split dir
 
 
+def test_raw_xml_url_points_at_hf_and_no_local_xml(tmp_path):
+    """The raw AKN XML is served from the cchew/lex-au HuggingFace dataset,
+    not bundled into the build output. `lexau export-hf` uploads the
+    contents of corpus/ to the dataset root, so the files live at
+    xml/<slug>.xml (no corpus/ prefix)."""
+    out_dir = tmp_path / "data"
+    build_site(
+        corpus_index=FIXTURES / "mini-corpus-index.json",
+        xml_dir=FIXTURES / "xml",
+        graph_path=None,
+        out_dir=out_dir,
+    )
+
+    bundle = json.loads((out_dir / "privacy-act-1988.json").read_text())
+    assert bundle["raw_xml_url"] == (
+        "https://huggingface.co/datasets/cchew/lex-au/resolve/main/xml/"
+        "privacy-act-1988.xml"
+    )
+    assert list(out_dir.glob("*.xml")) == []
+
+
 def test_collect_section_eids_recurses_into_divisions():
     toc_node = {
         "eid": "part-I",

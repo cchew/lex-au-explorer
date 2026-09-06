@@ -1,7 +1,6 @@
 from __future__ import annotations
 import importlib.util
 import json
-import shutil
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -201,9 +200,6 @@ def build_site(
                     _write_schedule_parts(sched_dir, node, sections)
         else:
             (out_dir / f"{meta.slug}.json").write_text(json.dumps(bundle))
-
-        if meta.xml_path.exists():
-            shutil.copy(meta.xml_path, out_dir / f"{meta.slug}.xml")
 
     (out_dir / "index.json").write_text(json.dumps(build_site_index(acts)))
     _write_ref_tally(out_dir, ref_tally)

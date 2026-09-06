@@ -27,7 +27,10 @@ def test_assemble_bundle_shape():
     assert bundle["toc"] == toc
     assert bundle["sections"] == sections
     assert bundle["definitions"] == definitions
-    assert bundle["raw_xml_url"] == "/data/privacy-act-1988.xml"
+    assert bundle["raw_xml_url"] == (
+        "https://huggingface.co/datasets/cchew/lex-au/resolve/main/xml/"
+        "privacy-act-1988.xml"
+    )
     assert bundle["split_by_part"] is False
     assert "verification" not in bundle
 
