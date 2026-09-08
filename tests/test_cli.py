@@ -40,6 +40,73 @@ def test_build_site_writes_index_and_bundle(tmp_path):
     assert "part-I__sec-6" in bundle["sections"]
 
 
+class _FakeGraph:
+    @staticmethod
+    def load(path):
+        return object()
+
+
+class _FakeResolver:
+    """Stands in for lexaugraph.resolver.DefinitionResolver: only the two
+    methods build_site touches (get_act_definitions for the bundle, and
+    resolve_definition via the RefIndex term adapter)."""
+
+    def __init__(self, graph):
+        self._graph = graph
+
+    def get_act_definitions(self, act_frbr_uri):
+        if act_frbr_uri == "/akn/au/act/1988/119":
+            return [
+                {
+                    "term": "personal information",
+                    "display_term": "personal information",
+                    "section_eid": "part-I__sec-6",
+                    "definition_text": "means information about an identified individual",
+                    "act_alike": False,
+                }
+            ]
+        return []
+
+    def resolve_definition(self, term, act_frbr_uri, section_eid=None):
+        return None
+
+
+def test_bundle_has_terms_not_definitions(tmp_path):
+    """No graph -> resolver is None -> the bundle still carries a terms list
+    (empty) and never the old definitions map."""
+    out_dir = tmp_path / "data"
+    build_site(
+        corpus_index=FIXTURES / "mini-corpus-index.json",
+        xml_dir=FIXTURES / "xml",
+        graph_path=None,
+        out_dir=out_dir,
+    )
+    bundle = json.loads((out_dir / "privacy-act-1988.json").read_text())
+    assert "definitions" not in bundle
+    assert bundle["terms"] == []
+
+
+def test_bundle_terms_come_from_get_act_definitions(tmp_path, monkeypatch):
+    """With a resolver, build_site calls get_act_definitions once per Act and
+    ships every term through build_terms into bundle['terms']."""
+    monkeypatch.setattr("lexaugraph.graph.LexAuGraph", _FakeGraph)
+    monkeypatch.setattr("lexaugraph.resolver.DefinitionResolver", _FakeResolver)
+
+    out_dir = tmp_path / "data"
+    build_site(
+        corpus_index=FIXTURES / "mini-corpus-index.json",
+        xml_dir=FIXTURES / "xml",
+        graph_path=tmp_path / "graph.json",  # presence triggers the resolver path; never read
+        out_dir=out_dir,
+    )
+    bundle = json.loads((out_dir / "privacy-act-1988.json").read_text())
+    assert "definitions" not in bundle
+    assert isinstance(bundle["terms"], list)
+    pi = next(t for t in bundle["terms"] if t["term"] == "personal information")
+    assert pi["defs"][0]["eid"].endswith("sec-6")
+    assert pi["display"] == "personal information"
+
+
 def test_build_site_flags_a_recorded_exception_and_infers_current_for_the_rest(tmp_path):
     out_dir = tmp_path / "data"
     verification = tmp_path / "verification.json"
@@ -170,10 +237,12 @@ def test_write_split_bundle_writes_one_file_per_part_plus_index(tmp_path):
         "part-I__sec-2": {"heading": "sec 2", "html": "<p>two</p>"},
         "part-II__sec-10": {"heading": "sec 10", "html": "<p>ten</p>"},
     }
-    definitions = {
-        "foo": {"text": "def of foo", "section_eid": "part-I__sec-1"},
-        "bar": {"text": "def of bar", "section_eid": "part-II__sec-10"},
-    }
+    terms = [
+        {"term": "foo", "display": "foo",
+         "defs": [{"text": "def of foo", "eid": "part-I__sec-1"}]},
+        {"term": "bar", "display": "bar",
+         "defs": [{"text": "def of bar", "eid": "part-II__sec-10"}]},
+    ]
     bundle_meta = {
         "frbr_uri": "/akn/au/act/2000/1",
         "title": "Big Act",
@@ -183,28 +252,91 @@ def test_write_split_bundle_writes_one_file_per_part_plus_index(tmp_path):
         "effective_date": "2026-01-01",
         "toc": toc,
         "sections": sections,
-        "definitions": definitions,
+        "terms": terms,
         "raw_xml_url": "https://huggingface.co/datasets/cchew/lex-au/resolve/main/xml/big-act.xml",
         "split_by_part": True,
     }
 
     out_dir = tmp_path / "data"
     out_dir.mkdir()
-    _write_split_bundle(out_dir, "big-act", toc, sections, definitions, bundle_meta)
+    _write_split_bundle(out_dir, "big-act", toc, sections, terms, bundle_meta)
 
     part_i = json.loads((out_dir / "big-act" / "part-I.json").read_text())
     assert set(part_i["sections"]) == {"part-I__sec-1", "part-I__sec-2"}
-    assert set(part_i["definitions"]) == {"foo"}
+    assert {t["term"] for t in part_i["terms"]} == {"foo"}
 
     part_ii = json.loads((out_dir / "big-act" / "part-II.json").read_text())
     assert set(part_ii["sections"]) == {"part-II__sec-10"}
-    assert set(part_ii["definitions"]) == {"bar"}
+    assert {t["term"] for t in part_ii["terms"]} == {"bar"}
 
     index_bundle = json.loads((out_dir / "big-act.json").read_text())
     assert index_bundle["split_by_part"] is True
     assert index_bundle["sections"] == {}
-    assert index_bundle["definitions"] == {}
+    assert index_bundle["terms"] == []
+    assert "definitions" not in index_bundle
     assert index_bundle["title"] == "Big Act"
+
+
+def test_write_split_bundle_includes_term_used_here_defined_elsewhere(tmp_path):
+    """A term defined in one Part but *used* in another rides in the second
+    Part's bundle too, so the reader can resolve it there."""
+    toc = [
+        {"eid": "part-I", "heading": "P1", "children": [
+            {"eid": "part-I__sec-1", "heading": "s1", "children": []}]},
+        {"eid": "part-II", "heading": "P2", "children": [
+            {"eid": "part-II__sec-10", "heading": "s10", "children": []}]},
+    ]
+    sections = {
+        "part-I__sec-1": {"heading": "s1", "html": "<p>widget means a small device.</p>"},
+        "part-II__sec-10": {"heading": "s10", "html": "<p>A widget must be registered.</p>"},
+    }
+    terms = [{"term": "widget", "display": "widget",
+              "defs": [{"text": "means a small device", "eid": "part-I__sec-1"}],
+              "usedInBody": True}]
+    bundle_meta = {"title": "A", "split_by_part": True, "toc": toc,
+                   "sections": sections, "terms": terms}
+    out_dir = tmp_path / "data"
+    out_dir.mkdir()
+    _write_split_bundle(out_dir, "a", toc, sections, terms, bundle_meta)
+
+    part_ii = json.loads((out_dir / "a" / "part-II.json").read_text())
+    assert [t["term"] for t in part_ii["terms"]] == ["widget"]
+    assert part_ii["terms"][0]["usedInBody"] is True
+
+
+def test_write_split_bundle_recomputes_usedInBody_per_part_without_mutating_terms(tmp_path):
+    """Carry #2: build a fresh list of copied dicts per Part. A term that rides
+    a Part only because it is defined there, but whose surface form is absent
+    from that Part's prose, loses usedInBody in that Part's copy -- and the
+    Act-level list plus its dicts are left untouched."""
+    toc = [
+        {"eid": "part-I", "heading": "P1", "children": [
+            {"eid": "part-I__sec-1", "heading": "s1", "children": []}]},
+        {"eid": "part-II", "heading": "P2", "children": [
+            {"eid": "part-II__sec-10", "heading": "s10", "children": []}]},
+    ]
+    sections = {
+        "part-I__sec-1": {"heading": "s1", "html": "<p>In this Act, X means a device.</p>"},
+        "part-II__sec-10": {"heading": "s10", "html": "<p>A widget must be registered.</p>"},
+    }
+    act_terms = [{"term": "widget", "display": "widget",
+                  "defs": [{"text": "means a device", "eid": "part-I__sec-1"}],
+                  "usedInBody": True}]
+    before = json.loads(json.dumps(act_terms))
+    bundle_meta = {"title": "A", "split_by_part": True, "toc": toc,
+                   "sections": sections, "terms": act_terms}
+    out_dir = tmp_path / "data"
+    out_dir.mkdir()
+    _write_split_bundle(out_dir, "a", toc, sections, act_terms, bundle_meta)
+
+    part_i = json.loads((out_dir / "a" / "part-I.json").read_text())
+    assert [t["term"] for t in part_i["terms"]] == ["widget"]  # defined here
+    assert "usedInBody" not in part_i["terms"][0]              # but not used here
+
+    part_ii = json.loads((out_dir / "a" / "part-II.json").read_text())
+    assert part_ii["terms"][0]["usedInBody"] is True           # used here
+
+    assert act_terms == before  # Act-level list + dicts unmutated
 
 
 def test_write_split_bundle_carries_verification_into_every_part_and_index(tmp_path):
@@ -214,14 +346,14 @@ def test_write_split_bundle_carries_verification_into_every_part_and_index(tmp_p
     sections = {"part-I__sec-1": {"heading": "sec 1", "html": "<p>one</p>"}}
     bundle_meta = {
         "title": "Big Act", "split_by_part": True, "toc": toc,
-        "sections": sections, "definitions": {},
+        "sections": sections, "terms": [],
         "verification": {"status": "stale", "checked_at": "2026-08-28",
                          "live_comp_id": "C2026C00301", "live_effective_date": "2026-07-01"},
     }
     out_dir = tmp_path / "data"
     out_dir.mkdir()
 
-    _write_split_bundle(out_dir, "big-act", toc, sections, {}, bundle_meta)
+    _write_split_bundle(out_dir, "big-act", toc, sections, [], bundle_meta)
 
     part_i = json.loads((out_dir / "big-act" / "part-I.json").read_text())
     index_bundle = json.loads((out_dir / "big-act.json").read_text())
@@ -438,11 +570,11 @@ def test_split_bundle_covers_every_source_section_exactly_once(tmp_path):
 
     sections, _ = build_sections(root, _bri([]))
     bundle_meta = {"title": "Synthetic Split Act", "split_by_part": True,
-                   "toc": toc, "sections": sections, "definitions": {}}
+                   "toc": toc, "sections": sections, "terms": []}
 
     out_dir = tmp_path / "data"
     out_dir.mkdir()
-    _write_split_bundle(out_dir, "synthetic-split", toc, sections, {}, bundle_meta)
+    _write_split_bundle(out_dir, "synthetic-split", toc, sections, [], bundle_meta)
 
     seen: dict[str, int] = {}
     for part_file in sorted((out_dir / "synthetic-split").glob("*.json")):
@@ -540,11 +672,11 @@ def test_write_split_bundle_routes_head_note_into_its_part_file(tmp_path):
         "part-I__sec-1": {"heading": "sec 1", "html": "<p>one</p>"},
     }
     bundle_meta = {"title": "Big Act", "split_by_part": True, "toc": toc,
-                   "sections": sections, "definitions": {}}
+                   "sections": sections, "terms": []}
     out_dir = tmp_path / "data"
     out_dir.mkdir()
 
-    _write_split_bundle(out_dir, "big-act", toc, sections, {}, bundle_meta)
+    _write_split_bundle(out_dir, "big-act", toc, sections, [], bundle_meta)
 
     part_i = json.loads((out_dir / "big-act" / "part-I.json").read_text())
     assert set(part_i["sections"]) == {"part-I__head", "part-I__sec-1"}
@@ -564,9 +696,11 @@ def test_split_by_part_act_writes_schedule_file(tmp_path, monkeypatch):
     sched = json.loads((out_dir / "split-sched-act" / "schedule-1.json").read_text())
     assert "schedule-1__clause-1" in sched["sections"]
     assert "definitions" not in sched
+    assert "terms" not in sched
 
     thin = json.loads((out_dir / "split-sched-act.json").read_text())
     assert thin["sections"] == {}
+    assert thin["terms"] == []
 
 
 def test_schedule_heavy_non_part_act_promoted(tmp_path, monkeypatch):
@@ -587,6 +721,7 @@ def test_schedule_heavy_non_part_act_promoted(tmp_path, monkeypatch):
     sched = json.loads((out_dir / "split-sched-act" / "schedule-1.json").read_text())
     assert "schedule-1__clause-1" in sched["sections"]  # real unit, not empty
     assert "definitions" not in sched
+    assert "terms" not in sched
 
 
 def test_schedule_under_threshold_stays_inline(tmp_path):

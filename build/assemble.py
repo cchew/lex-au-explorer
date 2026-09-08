@@ -13,7 +13,7 @@ def assemble_bundle(
     meta: ActMeta,
     toc: list[dict],
     sections: dict[str, dict],
-    definitions: dict[str, dict],
+    terms: list[dict],
     verification: dict | None = None,
 ) -> dict[str, Any]:
     bundle = {
@@ -27,7 +27,7 @@ def assemble_bundle(
         "number": meta.number,
         "toc": toc,
         "sections": sections,
-        "definitions": definitions,
+        "terms": terms,
         "raw_xml_url": f"{_HF_XML_BASE}/{meta.slug}.xml",
         "split_by_part": meta.split_by_part,
     }

@@ -12,9 +12,15 @@ def test_assemble_bundle_shape():
     )
     toc = [{"eid": "part-I", "heading": "Part 1", "children": []}]
     sections = {"part-I__sec-6": {"heading": "Definitions", "html": "<p>...</p>"}}
-    definitions = {"personal information": {"text": "means...", "section_eid": "part-I__sec-6"}}
+    terms = [
+        {
+            "term": "personal information",
+            "display": "personal information",
+            "defs": [{"text": "means...", "eid": "part-I__sec-6"}],
+        }
+    ]
 
-    bundle = assemble_bundle(meta, toc, sections, definitions)
+    bundle = assemble_bundle(meta, toc, sections, terms)
 
     assert bundle["frbr_uri"] == "/akn/au/act/1988/119"
     assert bundle["title"] == "Privacy Act 1988"
@@ -26,7 +32,8 @@ def test_assemble_bundle_shape():
     assert bundle["number"] == 119
     assert bundle["toc"] == toc
     assert bundle["sections"] == sections
-    assert bundle["definitions"] == definitions
+    assert bundle["terms"] == terms
+    assert "definitions" not in bundle
     assert bundle["raw_xml_url"] == (
         "https://huggingface.co/datasets/cchew/lex-au/resolve/main/xml/"
         "privacy-act-1988.xml"
@@ -44,6 +51,6 @@ def test_assemble_bundle_includes_verification_when_provided():
     )
     verification = {"status": "current", "checked_at": "2026-08-28"}
 
-    bundle = assemble_bundle(meta, [], {}, {}, verification=verification)
+    bundle = assemble_bundle(meta, [], {}, [], verification=verification)
 
     assert bundle["verification"] == verification

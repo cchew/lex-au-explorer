@@ -1,6 +1,7 @@
 from __future__ import annotations
 import importlib.util
 import json
+import re
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -10,6 +11,7 @@ import typer
 from build.metadata import load_corpus_index, build_site_index, ActMeta
 from build.assets import copy_figure_assets
 from build.bundle import build_toc, build_sections, build_preface, _local_tag
+from build.definitions import build_terms, _used_in_body
 from build.ir import Node
 from build.refindex import build_ref_index
 from build.stylemap import HtmlStyleMap, StyleMap
@@ -170,11 +172,21 @@ def build_site(
         )
         ref_tally[meta.slug] = _tally_dict(act_tally)
 
-        definitions = _resolve_all_definitions(resolver, meta.frbr_uri, sections) if resolver else {}
+        if resolver:
+            rows = resolver.get_act_definitions(meta.frbr_uri)
+            def_eids = {r["section_eid"] for r in rows}
+            body_text = " ".join(
+                _plain_text(v["html"])
+                for k, v in sections.items()
+                if k not in def_eids
+            )
+            terms = build_terms(rows, body_text)
+        else:
+            terms = []
         verification = derive_status(
             verification_entries.get(meta.title_id), meta.comp_id, ran_at=verification_ran_at
         )
-        bundle = assemble_bundle(meta, toc, sections, definitions, verification=verification)
+        bundle = assemble_bundle(meta, toc, sections, terms, verification=verification)
         preface = build_preface(root)
         if preface:
             bundle["preface"] = preface
@@ -183,7 +195,7 @@ def build_site(
             len(v["html"]) for k, v in sections.items() if _is_schedule_key(k)
         )
         if meta.split_by_part:
-            _write_split_bundle(out_dir, meta.slug, toc, sections, definitions, bundle)
+            _write_split_bundle(out_dir, meta.slug, toc, sections, terms, bundle)
         elif schedule_html_bytes > _SCHEDULE_SPLIT_BYTES:
             # Promote: body sections stay inline in <slug>.json, every schedule
             # is written out as <slug>/<schedule_eid>.json (Task 9).
@@ -248,20 +260,11 @@ def _write_ref_tally(out_dir: Path, ref_tally: dict[str, dict[str, int]]) -> Non
     (out_dir / "ref-tally.json").write_text(json.dumps(payload))
 
 
-def _resolve_all_definitions(resolver, act_frbr_uri: str, sections: dict[str, dict]) -> dict[str, dict]:
-    """Resolve every term marked data-term in every section, keyed by term
-    (last-resolved-wins is fine here since terms are looked up per-section
-    by the frontend at render time, not globally -- see Task 9)."""
-    import re
-    from build.definitions import resolve_section_definitions
-
-    all_defs: dict[str, dict] = {}
-    for section_eid, section in sections.items():
-        term_names = set(re.findall(r'data-term="([^"]+)"', section["html"]))
-        if not term_names:
-            continue
-        all_defs.update(resolve_section_definitions(resolver, act_frbr_uri, section_eid, term_names))
-    return all_defs
+def _plain_text(html: str) -> str:
+    """Strip tags from build-generated section HTML for a surface-form scan.
+    The HTML is well-formed and machine-emitted, so a tag strip is enough --
+    no entity decode or nesting concerns."""
+    return re.sub(r"<[^>]+>", " ", html)
 
 
 def _write_split_bundle(
@@ -269,7 +272,7 @@ def _write_split_bundle(
     slug: str,
     toc: list[dict],
     sections: dict[str, dict],
-    definitions: dict[str, dict],
+    terms: list[dict],
     bundle_meta: dict,
 ) -> None:
     """For the small number of largest Acts: one bundle per top-level Part
@@ -296,17 +299,32 @@ def _write_split_bundle(
 
     for part_eid, eids in part_section_eids.items():
         part_sections = {k: v for k, v in sections.items() if k in eids}
-        part_definitions = {
-            term: d for term, d in definitions.items() if d["section_eid"] in eids
-        }
+        part_body_lower = " ".join(
+            _plain_text(v["html"]) for v in part_sections.values()
+        ).lower()
+        # A term rides in this Part's bundle if it is defined here OR used here.
+        # Copy each surviving entry (never mutate the Act-level list or its
+        # dicts) and recompute usedInBody against THIS Part's own text.
+        part_terms: list[dict] = []
+        for t in terms:
+            defined_here = any(d["eid"] in eids for d in t["defs"])
+            used_here = _used_in_body(t["term"], part_body_lower)
+            if not (defined_here or used_here):
+                continue
+            copy = dict(t)
+            if used_here:
+                copy["usedInBody"] = True
+            else:
+                copy.pop("usedInBody", None)
+            part_terms.append(copy)
         part_bundle = dict(bundle_meta)
         part_bundle["sections"] = part_sections
-        part_bundle["definitions"] = part_definitions
+        part_bundle["terms"] = part_terms
         (part_dir / f"{part_eid}.json").write_text(json.dumps(part_bundle))
 
     index_bundle = dict(bundle_meta)
     index_bundle["sections"] = {}
-    index_bundle["definitions"] = {}
+    index_bundle["terms"] = []
     (out_dir / f"{slug}.json").write_text(json.dumps(index_bundle))
 
 
