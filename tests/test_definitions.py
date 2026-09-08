@@ -1,35 +1,54 @@
+import json
 from pathlib import Path
-import pytest
-from lexaugraph.graph import LexAuGraph
-from lexaugraph.loader import parse_act
-from lexaugraph.resolver import DefinitionResolver
-from build.definitions import resolve_section_definitions
+
+from build.definitions import build_terms, _surface_forms
 
 FIXTURES = Path(__file__).parent / "fixtures"
-INDEX_ENTRY = {
-    "name": "Privacy Act 1988", "year": 1988, "number": 119,
-    "effective_date": "2026-06-04", "xml_path": "xml/privacy-act-1988.xml",
-}
 
 
-@pytest.fixture()
-def resolver() -> DefinitionResolver:
-    act_data = parse_act(FIXTURES / "xml" / "privacy-act-1988.xml", INDEX_ENTRY)
-    g = LexAuGraph()
-    g.add_act_data(act_data)
-    return DefinitionResolver(g)
+def test_surface_forms_matches_shared_fixture():
+    fixture = json.loads((FIXTURES / "surface-forms.json").read_text())
+    for term, expected in fixture.items():
+        assert set(_surface_forms(term)) == set(expected), term
 
 
-def test_resolve_section_definitions_finds_used_term(resolver: DefinitionResolver):
-    result = resolve_section_definitions(
-        resolver, "/akn/au/act/1988/119", "part-I__sec-6", {"personal information"}
-    )
-    assert "personal information" in result
-    assert result["personal information"]["section_eid"] == "part-I__sec-6"
+def test_build_terms_groups_multiply_defined():
+    rows = [
+        {"term": "associate", "display_term": "associate", "section_eid": "part-5__sec-40",
+         "definition_text": "means B", "act_alike": False},
+        {"term": "associate", "display_term": "associate", "section_eid": "part-2__sec-10",
+         "definition_text": "means A", "act_alike": False},
+    ]
+    terms = build_terms(rows, body_text="an associate of the person")
+    assert len(terms) == 1
+    assert terms[0]["term"] == "associate"
+    assert [d["eid"] for d in terms[0]["defs"]] == ["part-2__sec-10", "part-5__sec-40"]
+    assert terms[0]["usedInBody"] is True
 
 
-def test_resolve_section_definitions_skips_unresolved_term(resolver: DefinitionResolver):
-    result = resolve_section_definitions(
-        resolver, "/akn/au/act/1988/119", "part-I__sec-6", {"not a real term"}
-    )
-    assert "not a real term" not in result
+def test_build_terms_renames_keys_and_via():
+    rows = [{"term": "widget", "display_term": "Widget", "section_eid": "sec-3",
+             "definition_text": "means a part", "act_alike": True,
+             "via": {"act_title": "Beta Act 2001", "section_eid": "sec-3", "resolved": True}}]
+    terms = build_terms(rows, body_text="the widget must")
+    d = terms[0]["defs"][0]
+    assert d == {"text": "means a part", "eid": "sec-3",
+                 "via": {"actTitle": "Beta Act 2001", "sectionEid": "sec-3", "resolved": True}}
+    assert terms[0]["display"] == "Widget"
+    assert terms[0]["actAlike"] is True
+
+
+def test_build_terms_used_in_body_via_inflection():
+    rows = [{"term": "centre", "display_term": "centre", "section_eid": "sec-1",
+             "definition_text": "means a place", "act_alike": False}]
+    terms = build_terms(rows, body_text="operates two centres in the state")
+    assert terms[0]["usedInBody"] is True
+
+
+def test_build_terms_omits_flags_when_false():
+    rows = [{"term": "onlydefined", "display_term": "onlydefined", "section_eid": "sec-1",
+             "definition_text": "means x", "act_alike": False}]
+    terms = build_terms(rows, body_text="nothing relevant here")
+    assert "usedInBody" not in terms[0]
+    assert "actAlike" not in terms[0]
+    assert len(terms) == 1  # NOT dropped from the bundle

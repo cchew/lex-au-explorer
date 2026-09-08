@@ -1,0 +1,6 @@
+{
+  "entity": ["entity", "entitys", "entityes", "entity's", "entity’s", "entities"],
+  "body corporate": ["body corporate", "body corporates", "body corporatees", "body corporate's", "body corporate’s"],
+  "*entity": ["entity", "entitys", "entityes", "entity's", "entity’s", "entities"],
+  "day-care centre": ["day-care centre", "day-care centres", "day-care centrees", "day-care centre's", "day-care centre’s"]
+}
