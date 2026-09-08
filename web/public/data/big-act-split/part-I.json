@@ -3,5 +3,5 @@
   "legislation_url": "https://www.legislation.gov.au/C1/latest/text",
   "comp_id": "C2", "effective_date": "2026-01-01",
   "toc": [], "sections": { "part-I__sec-1": { "heading": "Section 1", "html": "<p>Part I content.</p>" } },
-  "definitions": {}, "raw_xml_url": "/data/big-act-split.xml", "split_by_part": true
+  "terms": [], "raw_xml_url": "/data/big-act-split.xml", "split_by_part": true
 }

@@ -17,7 +17,7 @@ const MOCK_BUNDLE = {
   comp_id: "C2", effective_date: "2026-06-04",
   toc: [{ eid: "part-I", heading: "Part 1", children: [{ eid: "part-I__sec-6", heading: "Definitions", children: [] }] }],
   sections: { "part-I__sec-6": { heading: "Definitions", html: "<p>Test</p>" } },
-  definitions: {},
+  terms: [],
   raw_xml_url: "https://huggingface.co/datasets/cchew/lex-au/resolve/main/xml/privacy-act-1988.xml",
   split_by_part: false,
 };
@@ -26,7 +26,7 @@ const MOCK_INDEX = [
   { title: "Privacy Act 1988", slug: "privacy-act-1988", frbr_uri: "/akn/au/act/1988/119", split_by_part: false }
 ];
 
-// Split-by-Part index bundle: toc + Part structure present, but sections/definitions
+// Split-by-Part index bundle: toc + Part structure present, but sections/terms
 // are empty per Task 7's _write_split_bundle (they live in the per-Part files instead).
 const MOCK_SPLIT_INDEX_BUNDLE = {
   frbr_uri: "/akn/au/act/2009/28", title: "Fair Work Act 2009", title_id: "C1",
@@ -34,7 +34,7 @@ const MOCK_SPLIT_INDEX_BUNDLE = {
   comp_id: "C2", effective_date: "2026-06-04",
   toc: [{ eid: "part-I", heading: "Part 1", children: [{ eid: "part-I__sec-6", heading: "Definitions", children: [] }] }],
   sections: {},
-  definitions: {},
+  terms: [],
   raw_xml_url: "https://huggingface.co/datasets/cchew/lex-au/resolve/main/xml/fair-work-act-2009.xml",
   split_by_part: true,
 };
@@ -42,7 +42,7 @@ const MOCK_SPLIT_INDEX_BUNDLE = {
 const MOCK_SPLIT_PART_BUNDLE = {
   ...MOCK_SPLIT_INDEX_BUNDLE,
   sections: { "part-I__sec-6": { heading: "Definitions", html: "<p>Part content</p>" } },
-  definitions: {},
+  terms: [],
 };
 
 // Index bundle with two top-level Parts in its TOC, so a click on a Part II
@@ -58,7 +58,7 @@ const MOCK_SPLIT_INDEX_BUNDLE_TWO_PARTS = {
 const MOCK_SPLIT_PART_II_BUNDLE = {
   ...MOCK_SPLIT_INDEX_BUNDLE_TWO_PARTS,
   sections: { "part-II__sec-10": { heading: "Enforcement", html: "<p>Part II content</p>" } },
-  definitions: {},
+  terms: [],
 };
 
 const MOCK_SPLIT_INDEX = [
@@ -79,7 +79,7 @@ const MOCK_SPLIT_SCHEDULES_BUNDLE = {
     { eid: "schedule-1", heading: "Schedule 1", children: [{ eid: "schedule-1__clause-1", heading: "Amendments", children: [] }] },
   ],
   sections: { "part-1__sec-1": { heading: "Short title", html: "<p>Body provision</p>" } },
-  definitions: {},
+  terms: [],
   raw_xml_url: "https://huggingface.co/datasets/cchew/lex-au/resolve/main/xml/corporations-act-2001.xml",
   split_by_part: false,
   split_schedules: true,
@@ -684,5 +684,172 @@ describe("ReaderView", () => {
     expect(scheduleFetches()).toBe(1);
     expect(vm.bundle?.sections["schedule-1__clause-1"]).toBeDefined();
     expect(wrapper.text()).toContain("Schedule clause body");
+  });
+
+  it("builds the matcher per Part load, not per rendered section (Spec I1)", async () => {
+    // Spec I1: buildMatcher is invoked once per distinct Part load, NOT once per
+    // rendered <SectionContent>. loadPart reassigns bundle.terms via
+    //   bundle.value = { ...bundle.value, terms: mergeTerms(...) }
+    // so `watch(() => bundle.value?.terms)` refires on every Part load and
+    // buildMatcher runs once per Part (plus once for the initial index bundle).
+    // Navigating part-I -> part-II -> part-I loads two distinct Parts (part-I is
+    // cached on return via loadedGroups, so no re-fetch and no bundle
+    // reassignment), so buildMatcher runs at most 3x total -- and strictly
+    // fewer times than the number of sections rendered. The old, wrong
+    // assertion (`toHaveBeenCalledTimes(1)`) contradicts this merge model.
+    const IDX = {
+      ...MOCK_SPLIT_INDEX_BUNDLE,
+      toc: [
+        { eid: "part-I", heading: "Part 1", children: [
+          { eid: "part-I__sec-1", heading: "S1", children: [] },
+          { eid: "part-I__sec-2", heading: "S2", children: [] },
+          { eid: "part-I__sec-3", heading: "S3", children: [] },
+          { eid: "part-I__sec-4", heading: "S4", children: [] },
+        ] },
+        { eid: "part-II", heading: "Part 2", children: [
+          { eid: "part-II__sec-5", heading: "S5", children: [] },
+        ] },
+      ],
+    };
+    const PART_I = {
+      ...IDX,
+      sections: {
+        "part-I__sec-1": { heading: "S1", html: "<p>a</p>" },
+        "part-I__sec-2": { heading: "S2", html: "<p>b</p>" },
+        "part-I__sec-3": { heading: "S3", html: "<p>c</p>" },
+        "part-I__sec-4": { heading: "S4", html: "<p>d</p>" },
+      },
+      terms: [],
+    };
+    const PART_II = {
+      ...IDX,
+      sections: { "part-II__sec-5": { heading: "S5", html: "<p>e</p>" } },
+      terms: [],
+    };
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url.includes("index.json")) return jsonResponse(MOCK_SPLIT_INDEX);
+      if (url.includes("/fair-work-act-2009/part-I.json")) return jsonResponse(PART_I);
+      if (url.includes("/fair-work-act-2009/part-II.json")) return jsonResponse(PART_II);
+      return jsonResponse(IDX);
+    }));
+
+    const th = await import("../src/lib/termHighlight");
+    const spy = vi.spyOn(th, "buildMatcher");
+
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: "/reader", component: ReaderView }],
+    });
+    router.push("/reader");
+    await router.isReady();
+
+    const wrapper = mount(ReaderView, { global: { plugins: [router] } });
+    await new Promise((r) => setTimeout(r, 10));
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+
+    await wrapper.find(".shortcut-btn").trigger("click");
+    await new Promise((r) => setTimeout(r, 10));
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+    await new Promise((r) => setTimeout(r, 10));
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+
+    // Part I active: four sections rendered.
+    const sectionsOnPartI = wrapper.findAll(".section-content").length;
+    expect(sectionsOnPartI).toBe(4);
+
+    // part-I -> part-II
+    const p2 = wrapper.findAll(".toc-leaf").find((b) => b.text() === "S5");
+    expect(p2).toBeTruthy();
+    await p2!.trigger("click");
+    await new Promise((r) => setTimeout(r, 10));
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+
+    // part-II -> part-I (cached: no re-fetch, no bundle reassignment, no rebuild)
+    const p1 = wrapper.findAll(".toc-leaf").find((b) => b.text() === "S1");
+    expect(p1).toBeTruthy();
+    await p1!.trigger("click");
+    await new Promise((r) => setTimeout(r, 10));
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+
+    // Matcher IS built, but bounded by distinct Part loads (<= index + 2 Parts),
+    // never once per section.
+    expect(spy.mock.calls.length).toBeGreaterThanOrEqual(1);
+    expect(spy.mock.calls.length).toBeLessThanOrEqual(3);
+    expect(spy.mock.calls.length).toBeLessThan(sectionsOnPartI);
+    spy.mockRestore();
+  });
+
+  it("mergeTerms unions defs and usedInBody across Part loads", async () => {
+    // part-I defines 'x' (usedInBody false, def eid in part-I); part-II carries
+    // 'x' again with a second def eid and usedInBody true. After navigating
+    // into part-II the merged bundle.terms must hold ONE 'x' entry whose defs
+    // cover both eids and whose usedInBody is true.
+    const IDX = {
+      ...MOCK_SPLIT_INDEX_BUNDLE_TWO_PARTS,
+      terms: [],
+    };
+    const PART_I = {
+      ...IDX,
+      sections: { "part-I__sec-6": { heading: "Definitions", html: "<p>x means a thing</p>" } },
+      terms: [
+        { term: "x", display: "x", defs: [{ text: "a thing", eid: "part-I__sec-6" }], usedInBody: false },
+      ],
+    };
+    const PART_II = {
+      ...IDX,
+      sections: { "part-II__sec-10": { heading: "Enforcement", html: "<p>the x applies here</p>" } },
+      terms: [
+        { term: "x", display: "x", defs: [{ text: "as applied", eid: "part-II__sec-10" }], usedInBody: true },
+      ],
+    };
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url.includes("index.json")) return jsonResponse(MOCK_SPLIT_INDEX);
+      if (url.includes("/fair-work-act-2009/part-I.json")) return jsonResponse(PART_I);
+      if (url.includes("/fair-work-act-2009/part-II.json")) return jsonResponse(PART_II);
+      return jsonResponse(IDX);
+    }));
+
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: "/reader", component: ReaderView }],
+    });
+    router.push("/reader");
+    await router.isReady();
+
+    const wrapper = mount(ReaderView, { global: { plugins: [router] } });
+    await new Promise((r) => setTimeout(r, 10));
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+
+    await wrapper.find(".shortcut-btn").trigger("click");
+    await new Promise((r) => setTimeout(r, 10));
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+    await new Promise((r) => setTimeout(r, 10));
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+
+    // Navigate into Part II so its terms are merged.
+    const partIILeaf = wrapper.findAll(".toc-leaf").find((b) => b.text() === "Enforcement");
+    expect(partIILeaf).toBeTruthy();
+    await partIILeaf!.trigger("click");
+    await new Promise((r) => setTimeout(r, 10));
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+
+    const vm = wrapper.vm as unknown as ReaderVm;
+    const xs = (vm.bundle?.terms ?? []).filter((t) => t.term === "x");
+    expect(xs).toHaveLength(1);
+    expect(xs[0]!.usedInBody).toBe(true);
+    const eids = xs[0]!.defs.map((d) => d.eid);
+    expect(eids).toHaveLength(2);
+    expect(new Set(eids)).toEqual(new Set(["part-I__sec-6", "part-II__sec-10"]));
   });
 });

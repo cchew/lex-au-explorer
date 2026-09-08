@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted } from "vue";
+import { ref, computed, nextTick, onMounted, watch, shallowRef, markRaw } from "vue";
 import { useRoute } from "vue-router";
 import ActSearch from "../components/ActSearch.vue";
 import ActToc from "../components/ActToc.vue";
@@ -7,7 +7,8 @@ import ActHeader from "../components/ActHeader.vue";
 import ActPreface from "../components/ActPreface.vue";
 import SectionContent from "../components/SectionContent.vue";
 import SourceTrustPanel from "../components/SourceTrustPanel.vue";
-import type { ActBundle, SectionEntry, TocNode } from "../types";
+import type { ActBundle, SectionEntry, TocNode, TermEntry } from "../types";
+import { buildMatcher, type Matcher } from "../lib/termHighlight";
 import { track } from "../lib/analytics";
 
 const route = useRoute();
@@ -20,6 +21,70 @@ const currentSlug = ref<string | null>(null);
 // section maps have already been fetched and merged into `bundle.value`.
 // Revisiting any group in this set must be a genuine no-op -- no re-fetch.
 const loadedGroups = ref<Set<string>>(new Set());
+
+// Runtime term highlighting. `matcher` holds a RegExp + Maps and must never be
+// made deeply reactive: shallowRef + markRaw keep Vue's proxy off it.
+// termIndex is the term -> entry lookup SectionContent uses on hover.
+const matcher = shallowRef<Matcher | null>(null);
+const termIndex = shallowRef<Map<string, TermEntry>>(new Map());
+const highlightEnabled = ref(readHighlightToggle());
+
+function readHighlightToggle(): boolean {
+  try {
+    return localStorage.getItem("lexau:highlight") !== "off";
+  } catch {
+    return true;
+  }
+}
+watch(highlightEnabled, (v) => {
+  try {
+    localStorage.setItem("lexau:highlight", v ? "on" : "off");
+  } catch {
+    /* localStorage unavailable (private mode / SSR) -- toggle still works in-session */
+  }
+});
+
+// Reset the matcher between Acts so a stale one never bleeds across a slug
+// change before the new bundle's terms arrive.
+watch(currentSlug, () => {
+  matcher.value = null;
+  termIndex.value = new Map();
+});
+
+// Spec I1: rebuild the matcher once per distinct `bundle.terms` identity, NOT
+// once per rendered section. `loadPart` reassigns `bundle.value` with a fresh
+// `terms` array on every Part load (via `mergeTerms`), so this watch refires
+// once per Part -- bounded by the number of Parts navigated, far below the
+// section count. `{ immediate: true }` covers the initial single-file bundle.
+watch(
+  () => bundle.value?.terms,
+  (terms) => {
+    if (!terms) return;
+    termIndex.value = new Map(terms.map((t) => [t.term, t]));
+    matcher.value = markRaw(buildMatcher(terms.filter((t) => t.usedInBody)));
+  },
+  { immediate: true },
+);
+
+// Union term entries across Part loads without mutating either input: a term
+// defined in one Part and used in another must end up with one entry carrying
+// every def eid and `usedInBody` true if any contributing Part marked it so.
+// `b` defaults to [] so a Schedule part file (no `terms` key) returns a copy
+// of `a` unchanged.
+function mergeTerms(a: TermEntry[], b: TermEntry[] = []): TermEntry[] {
+  const byTerm = new Map(a.map((e) => [e.term, { ...e, defs: [...e.defs] }]));
+  for (const e of b) {
+    const cur = byTerm.get(e.term);
+    if (!cur) {
+      byTerm.set(e.term, { ...e, defs: [...e.defs] });
+      continue;
+    }
+    for (const d of e.defs) if (!cur.defs.some((x) => x.eid === d.eid)) cur.defs.push(d);
+    cur.usedInBody = cur.usedInBody || e.usedInBody;
+    cur.actAlike = cur.actAlike || e.actAlike;
+  }
+  return [...byTerm.values()];
+}
 
 // Fetch + parse a JSON bundle, distinguishing "not found" from "malformed."
 //
@@ -80,11 +145,14 @@ async function loadPart(slug: string, partEid: string) {
       // inline body sections when a Schedule file is pulled in. `visibleSections`
       // still filters to the active top node, so held-but-inactive entries are
       // never mis-rendered. Schedule part files carry only `sections` (no
-      // `definitions`); `...undefined` spreads to nothing, so the merge is safe.
+      // `terms`); `mergeTerms(a, undefined)` returns a copy of `a`, so the
+      // merge is safe. A fresh `terms` array each call is deliberate: it is
+      // what refires the `bundle.value?.terms` watch to rebuild the matcher
+      // once per Part (Spec I1).
       bundle.value = {
         ...bundle.value,
         sections: { ...bundle.value.sections, ...partData.sections },
-        definitions: { ...bundle.value.definitions, ...partData.definitions },
+        terms: mergeTerms(bundle.value.terms, partData.terms),
       };
     }
     // Reassign (not a bare `.add`) so Vue reactivity fires on the ref.
@@ -262,8 +330,19 @@ onMounted(() => {
         <ActHeader :bundle="bundle" />
         <ActPreface :bundle="bundle" />
         <SourceTrustPanel :bundle="bundle" />
+        <label class="highlight-toggle">
+          <input type="checkbox" v-model="highlightEnabled" />
+          Highlight defined terms
+        </label>
         <div v-for="s in visibleSections" :key="s.eid" :id="s.eid" class="section-anchor">
-          <SectionContent :section="s.section" :definitions="bundle.definitions" :slug="currentSlug ?? undefined" />
+          <SectionContent
+            :section="s.section"
+            :matcher="matcher"
+            :term-index="termIndex"
+            :section-eid="s.eid"
+            :highlight-enabled="highlightEnabled"
+            :slug="currentSlug ?? undefined"
+          />
         </div>
       </div>
     </div>
@@ -285,6 +364,16 @@ onMounted(() => {
 }
 
 .content-pane { min-width: 0; }
+
+.highlight-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-size: 0.8125rem;
+  color: var(--color-ink-2);
+  margin-bottom: var(--s-4);
+  cursor: pointer;
+}
 
 .section-anchor { scroll-margin-top: var(--s-4); }
 .section-anchor + .section-anchor { margin-top: var(--s-5); padding-top: var(--s-5); border-top: 1px solid var(--color-border); }

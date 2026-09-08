@@ -4,7 +4,7 @@
   "comp_id": "C2026C00227", "effective_date": "2026-06-04",
   "toc": [{ "eid": "part-I", "heading": "Part 1", "children": [{ "eid": "part-I__sec-6", "heading": "Definitions", "children": [] }] }],
   "sections": { "part-I__sec-6": { "heading": "Definitions", "html": "<p>See <span data-term=\"personal information\">personal information</span>.</p>" } },
-  "definitions": { "personal information": { "text": "means information about an identified individual.", "section_eid": "part-I__sec-6" } },
+  "terms": [],
   "raw_xml_url": "/data/privacy-act-1988.xml",
   "split_by_part": false,
   "verification": { "status": "current", "checked_at": "2026-08-28" }
