@@ -76,8 +76,8 @@ describe("buildMatcher + highlightTerms", () => {
     highlightTerms(root, m, "sec-1", { stoplist: new Set() });
     const spans = root.querySelectorAll("span[data-def-eid]");
     expect(spans.length).toBe(1);
-    expect(spans[0].getAttribute("role")).toBe("button");
-    expect(spans[0].getAttribute("tabindex")).toBe("0");
+    expect(spans[0]!.getAttribute("role")).toBe("button");
+    expect(spans[0]!.getAttribute("tabindex")).toBe("0");
   });
 
   it("unhighlightTerms round-trips and leaves corpus spans", () => {
