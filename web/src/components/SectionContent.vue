@@ -1,35 +1,76 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, watch, onMounted, nextTick } from "vue";
 import DefinitionTooltip from "./DefinitionTooltip.vue";
-import type { DefinitionEntry } from "../types";
+import type { TermEntry, DefEntry } from "../types";
+import type { Matcher } from "../lib/termHighlight";
+import { highlightTerms, unhighlightTerms, resolveDef, STOPLIST } from "../lib/termHighlight";
 import { track } from "../lib/analytics";
 
 const props = defineProps<{
   section: { heading: string; html: string };
-  definitions: Record<string, DefinitionEntry>;
+  matcher: Matcher | null;
+  termIndex: Map<string, TermEntry>;
+  sectionEid: string;
+  highlightEnabled: boolean;
   slug?: string;
 }>();
 
-const activeTerm = ref<string | null>(null);
+const rootRef = ref<HTMLElement | null>(null);
+const activeDef = ref<DefEntry | null>(null);
+const activeEntry = ref<TermEntry | null>(null);
 let showTimer: ReturnType<typeof setTimeout> | null = null;
 
-function onMouseEnter(event: MouseEvent) {
+function applyHighlight() {
+  const root = rootRef.value;
+  if (!root) return;
+  unhighlightTerms(root);
+  if (props.highlightEnabled && props.matcher)
+    highlightTerms(root, props.matcher, props.sectionEid, { stoplist: STOPLIST });
+}
+
+onMounted(() => nextTick(applyHighlight));
+watch(
+  [() => props.section.html, () => props.highlightEnabled, () => props.matcher],
+  () => nextTick(applyHighlight),
+);
+
+function pickDef(entry: TermEntry, defEid: string | undefined): DefEntry | undefined {
+  if (defEid) return entry.defs.find((d) => d.eid === defEid);
+  return resolveDef(entry, props.sectionEid) ?? entry.defs[0];
+}
+
+function onActivate(event: Event) {
   const target = event.target as HTMLElement;
-  const term = target.dataset.term;
-  if (!term || !props.definitions[term]) return;
+  if (!target?.dataset?.term) return;
+  const entry = props.termIndex.get(target.dataset.term);
+  if (!entry) return;
+  if (!target.getAttribute("role")) {
+    target.tabIndex = 0;
+    target.setAttribute("role", "button");
+    target.setAttribute("aria-label", `defined term: ${entry.display}`);
+  }
+  const defEid = target.dataset.defEid;
+  const def = pickDef(entry, defEid);
+  if (!def) return;
   if (showTimer) clearTimeout(showTimer);
   // Only tracked once the tooltip actually shows (past the 200ms delay),
   // not on every mouseover -- a pass-through hover shouldn't count as a
   // "key interaction."
   showTimer = setTimeout(() => {
-    activeTerm.value = term;
-    track("definition_hover", props.slug ? { term, slug: props.slug } : { term });
+    activeDef.value = def;
+    activeEntry.value = entry;
+    track("definition_hover", {
+      term: entry.term,
+      context: defEid ? "body" : "definitions",
+      ...(props.slug ? { slug: props.slug } : {}),
+    });
   }, 200);
 }
 
-function onMouseLeave() {
+function onDismiss() {
   if (showTimer) clearTimeout(showTimer);
-  activeTerm.value = null;
+  activeDef.value = null;
+  activeEntry.value = null;
 }
 </script>
 
@@ -37,15 +78,21 @@ function onMouseLeave() {
   <div class="section-content">
     <h3>{{ section.heading }}</h3>
     <div
+      ref="rootRef"
       class="section-html"
       v-html="section.html"
-      @mouseover="onMouseEnter"
-      @mouseout="onMouseLeave"
+      @mouseover="onActivate"
+      @mouseout="onDismiss"
+      @focusin="onActivate"
+      @focusout="onDismiss"
     ></div>
     <DefinitionTooltip
-      v-if="activeTerm && definitions[activeTerm]"
-      :text="definitions[activeTerm]!.text"
-      :section-eid="definitions[activeTerm]!.section_eid"
+      v-if="activeDef"
+      :text="activeDef.text"
+      :section-eid="activeDef.eid"
+      :via="activeDef.via"
+      :term="activeEntry?.display"
+      :act-alike="activeEntry?.actAlike"
     />
   </div>
 </template>
@@ -55,6 +102,7 @@ function onMouseLeave() {
 .section-content h3 { font-size: 1rem; margin-bottom: var(--s-3); color: var(--color-ink); }
 .section-html :deep(p) { margin-bottom: var(--s-3); font-size: 0.875rem; line-height: 1.7; color: var(--color-ink); }
 .section-html :deep([data-term]) { border-bottom: 1px dashed var(--color-accent-border); cursor: help; }
+.section-html :deep([data-term]:focus-visible) { outline: 2px solid var(--color-link); outline-offset: 2px; }
 
 /* Provision levels: CSS-grid hanging indent -- the num sits in a left
    gutter column, the body in the second column. The indent step grows
