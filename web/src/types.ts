@@ -16,9 +16,18 @@ export interface SectionEntry {
   html: string;
 }
 
-export interface DefinitionEntry {
+export interface DefEntry {
   text: string;
-  section_eid: string;
+  eid: string;
+  via?: { actTitle: string; sectionEid?: string; resolved: boolean };
+}
+
+export interface TermEntry {
+  term: string;
+  display: string;
+  defs: DefEntry[];
+  actAlike?: boolean;
+  usedInBody?: boolean;
 }
 
 export interface VerificationInfo {
@@ -44,7 +53,7 @@ export interface ActBundle {
   number: number;
   toc: TocNode[];
   sections: Record<string, SectionEntry>;
-  definitions: Record<string, DefinitionEntry>;
+  terms: TermEntry[];
   raw_xml_url: string;
   split_by_part: boolean;
   // Emitted by the build only when true (large Acts whose Schedules live in
