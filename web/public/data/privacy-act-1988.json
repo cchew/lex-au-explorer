@@ -2,9 +2,36 @@
   "frbr_uri": "/akn/au/act/1988/119", "title": "Privacy Act 1988", "title_id": "C2004A03712",
   "legislation_url": "https://www.legislation.gov.au/C2004A03712/latest/text",
   "comp_id": "C2026C00227", "effective_date": "2026-06-04",
-  "toc": [{ "eid": "part-I", "heading": "Part 1", "children": [{ "eid": "part-I__sec-6", "heading": "Definitions", "children": [] }] }],
-  "sections": { "part-I__sec-6": { "heading": "Definitions", "html": "<p>See <span data-term=\"personal information\">personal information</span>.</p>" } },
-  "terms": [],
+  "toc": [
+    { "eid": "part-I", "heading": "Part 1", "children": [
+      { "eid": "part-I__sec-6", "heading": "Definitions", "children": [] }
+    ] },
+    { "eid": "part-IIIA", "heading": "Part IIIA - Credit reporting", "children": [
+      { "eid": "part-IIIA__sec-21D", "heading": "Dealing with credit information", "children": [] }
+    ] }
+  ],
+  "sections": {
+    "part-I__sec-6": { "heading": "Definitions", "html": "<p>See <span data-term=\"personal information\">personal information</span>.</p>" },
+    "part-IIIA__sec-21D": { "heading": "Dealing with credit information", "html": "<p>A credit provider must not use or disclose credit eligibility information about an individual unless the credit provider is permitted to do so under this section. Each credit provider must comply with the applicable requirements before the credit provider discloses that information.</p>" }
+  },
+  "terms": [
+    {
+      "term": "personal information",
+      "display": "personal information",
+      "usedInBody": false,
+      "defs": [
+        { "text": "means information about an identified individual.", "eid": "part-I__sec-6" }
+      ]
+    },
+    {
+      "term": "credit provider",
+      "display": "credit provider",
+      "usedInBody": true,
+      "defs": [
+        { "text": "has the meaning given by section 6G, and includes a bank or other entity that supplies credit in the course of a business.", "eid": "part-IIIA__sec-21D" }
+      ]
+    }
+  ],
   "raw_xml_url": "/data/privacy-act-1988.xml",
   "split_by_part": false,
   "verification": { "status": "current", "checked_at": "2026-08-28" }
