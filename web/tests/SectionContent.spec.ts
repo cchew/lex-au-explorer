@@ -69,4 +69,13 @@ describe("SectionContent", () => {
     await w.vm.$nextTick();
     expect(track).toHaveBeenCalledWith("definition_hover", expect.objectContaining({ context: "body", slug: "privacy-act-1988" }));
   });
+
+  it("clears the pending hover timer on unmount so it never fires", async () => {
+    const w = mount(SectionContent, { props: base });
+    await w.vm.$nextTick();
+    await w.find("span[data-term='personal information'][data-def-eid='part-I__sec-6']").trigger("mouseover");
+    w.unmount();
+    vi.advanceTimersByTime(200);
+    expect(track).not.toHaveBeenCalled();
+  });
 });

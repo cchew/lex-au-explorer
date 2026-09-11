@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, nextTick } from "vue";
+import { ref, watch, onMounted, onUnmounted, nextTick } from "vue";
 import DefinitionTooltip from "./DefinitionTooltip.vue";
 import type { TermEntry, DefEntry } from "../types";
 import type { Matcher } from "../lib/termHighlight";
@@ -72,6 +72,10 @@ function onDismiss() {
   activeDef.value = null;
   activeEntry.value = null;
 }
+
+onUnmounted(() => {
+  if (showTimer) clearTimeout(showTimer);
+});
 </script>
 
 <template>
