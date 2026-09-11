@@ -34,10 +34,10 @@ describe("SectionContent", () => {
     expect(w.text()).toContain("means information about an identified individual.");
   });
 
-  it("stoplist term wrapped once", async () => {
+  it("stoplist term never wrapped", async () => {
     const w = mount(SectionContent, { props: base });
     await w.vm.$nextTick();
-    expect(w.findAll("span[data-term='person']").length).toBe(1);
+    expect(w.findAll("span[data-term='person']").length).toBe(0);
   });
 
   it("no runtime spans when highlightEnabled is false; toggling on adds them", async () => {
@@ -77,5 +77,40 @@ describe("SectionContent", () => {
     w.unmount();
     vi.advanceTimersByTime(200);
     expect(track).not.toHaveBeenCalled();
+  });
+
+  it("positions the tooltip near the hovered term instead of at a fixed offset", async () => {
+    const anchorRect = { left: 300, top: 300, right: 340, bottom: 316, width: 40, height: 16 } as DOMRect;
+    const tooltipRect = { left: 0, top: 0, right: 320, bottom: 150, width: 320, height: 150 } as DOMRect;
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      return this.classList.contains("tooltip-anchor") ? tooltipRect : anchorRect;
+    });
+    Object.defineProperty(window, "innerWidth", { value: 1200, configurable: true });
+    Object.defineProperty(window, "innerHeight", { value: 1000, configurable: true });
+
+    const w = mount(SectionContent, { props: base });
+    await w.vm.$nextTick();
+    await w.find("span[data-term='personal information'][data-def-eid='part-I__sec-6']").trigger("mouseover");
+    vi.runAllTimers();
+    await w.vm.$nextTick();
+    await w.vm.$nextTick();
+    const wrapper = w.get(".tooltip-anchor");
+    expect(wrapper.attributes("style")).toContain("top: 320px"); // anchor.bottom(316) + gap(4)
+    expect(wrapper.attributes("style")).toContain("left: 300px");
+  });
+
+  it("keeps the tooltip open when the mouse moves from the term onto it, and dismisses on truly leaving", async () => {
+    const w = mount(SectionContent, { props: base });
+    await w.vm.$nextTick();
+    await w.find("span[data-term='personal information'][data-def-eid='part-I__sec-6']").trigger("mouseover");
+    vi.runAllTimers();
+    await w.vm.$nextTick();
+    const wrapper = w.get(".tooltip-anchor");
+
+    await w.find(".section-html").trigger("mouseout", { relatedTarget: wrapper.element });
+    expect(w.find(".tooltip-anchor").exists()).toBe(true);
+
+    await wrapper.trigger("mouseleave", { relatedTarget: document.body });
+    expect(w.find(".tooltip-anchor").exists()).toBe(false);
   });
 });

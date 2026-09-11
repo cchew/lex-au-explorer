@@ -35,8 +35,6 @@ const href = computed(() => (props.term ? actAlikeUrl(props.term) : ""));
 
 <style scoped>
 .definition-tooltip {
-  position: absolute;
-  z-index: 20;
   max-width: 320px;
   padding: var(--s-3);
   background: var(--color-surface);

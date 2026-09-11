@@ -4,6 +4,7 @@ import DefinitionTooltip from "./DefinitionTooltip.vue";
 import type { TermEntry, DefEntry } from "../types";
 import type { Matcher } from "../lib/termHighlight";
 import { highlightTerms, unhighlightTerms, resolveDef, STOPLIST } from "../lib/termHighlight";
+import { positionTooltip } from "../lib/tooltipPosition";
 import { track } from "../lib/analytics";
 
 const props = defineProps<{
@@ -16,9 +17,28 @@ const props = defineProps<{
 }>();
 
 const rootRef = ref<HTMLElement | null>(null);
+const tooltipWrapperRef = ref<HTMLElement | null>(null);
 const activeDef = ref<DefEntry | null>(null);
 const activeEntry = ref<TermEntry | null>(null);
+const anchorRect = ref<DOMRect | null>(null);
+const tooltipStyle = ref<Record<string, string>>({});
 let showTimer: ReturnType<typeof setTimeout> | null = null;
+
+// Renders the wrapper hidden at (0, 0) first so its real size can be
+// measured, then repositions it near `anchorRect` and reveals it -- the
+// tooltip's own footprint (via/citation/Act Alike lines all vary its
+// height) isn't known until it's actually in the DOM.
+async function placeTooltip() {
+  tooltipStyle.value = { position: "fixed", top: "0px", left: "0px", visibility: "hidden" };
+  await nextTick();
+  const wrapper = tooltipWrapperRef.value;
+  if (!wrapper || !anchorRect.value) return;
+  const pos = positionTooltip(anchorRect.value, wrapper.getBoundingClientRect(), {
+    width: window.innerWidth,
+    height: window.innerHeight,
+  });
+  tooltipStyle.value = { position: "fixed", top: `${pos.top}px`, left: `${pos.left}px`, visibility: "visible" };
+}
 
 function applyHighlight() {
   const root = rootRef.value;
@@ -59,6 +79,8 @@ function onActivate(event: Event) {
   showTimer = setTimeout(() => {
     activeDef.value = def;
     activeEntry.value = entry;
+    anchorRect.value = target.getBoundingClientRect();
+    placeTooltip();
     track("definition_hover", {
       term: entry.term,
       context: defEid ? "body" : "definitions",
@@ -67,10 +89,28 @@ function onActivate(event: Event) {
   }, 200);
 }
 
-function onDismiss() {
+function dismiss() {
   if (showTimer) clearTimeout(showTimer);
   activeDef.value = null;
   activeEntry.value = null;
+}
+
+// The tooltip renders as a sibling of `.section-html`, not a descendant, so
+// moving the mouse off the highlighted term and onto the tooltip (e.g. to
+// reach the Act Alike link) fires this element's mouseout/focusout even
+// though the pointer never left the "hover region" conceptually. Only
+// dismiss when the pointer/focus is headed somewhere other than the
+// tooltip -- `onTooltipLeave` below owns dismissal once it's actually left.
+function onDismiss(event: FocusEvent | MouseEvent) {
+  const related = event.relatedTarget as Node | null;
+  if (related && tooltipWrapperRef.value?.contains(related)) return;
+  dismiss();
+}
+
+function onTooltipLeave(event: MouseEvent) {
+  const related = event.relatedTarget as Node | null;
+  if (related && rootRef.value?.contains(related)) return;
+  dismiss();
 }
 
 onUnmounted(() => {
@@ -90,19 +130,27 @@ onUnmounted(() => {
       @focusin="onActivate"
       @focusout="onDismiss"
     ></div>
-    <DefinitionTooltip
+    <div
       v-if="activeDef"
-      :text="activeDef.text"
-      :section-eid="activeDef.eid"
-      :via="activeDef.via"
-      :term="activeEntry?.display"
-      :act-alike="activeEntry?.actAlike"
-    />
+      ref="tooltipWrapperRef"
+      class="tooltip-anchor"
+      :style="tooltipStyle"
+      @mouseleave="onTooltipLeave"
+    >
+      <DefinitionTooltip
+        :text="activeDef.text"
+        :section-eid="activeDef.eid"
+        :via="activeDef.via"
+        :term="activeEntry?.display"
+        :act-alike="activeEntry?.actAlike"
+      />
+    </div>
   </div>
 </template>
 
 <style scoped>
 .section-content { position: relative; max-width: 1200px; }
+.tooltip-anchor { z-index: 20; }
 .section-content h3 { font-size: 1rem; margin-bottom: var(--s-3); color: var(--color-ink); }
 .section-html :deep(p) { margin-bottom: var(--s-3); font-size: 0.875rem; line-height: 1.7; color: var(--color-ink); }
 .section-html :deep([data-term]) { border-bottom: 1px dashed var(--color-accent-border); cursor: help; }

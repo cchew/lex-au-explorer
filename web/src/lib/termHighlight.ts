@@ -99,7 +99,6 @@ export function highlightTerms(
     const parent = (n as Text).parentElement;
     if (parent && !parent.closest(SKIP_SELECTOR)) targets.push(n as Text);
   }
-  const seenStop = new Set<string>();
   for (const node of targets) {
     const text = node.nodeValue ?? "";
     m.regex.lastIndex = 0;
@@ -108,7 +107,7 @@ export function highlightTerms(
     for (let mm = m.regex.exec(text); mm; mm = m.regex.exec(text)) {
       const entry = m.lookup.get(mm[0].toLowerCase());
       if (!entry) continue;
-      if (opts.stoplist.has(entry.term) && seenStop.has(entry.term)) continue;
+      if (opts.stoplist.has(entry.term)) continue;
       const def = resolveDef(entry, sectionEid);
       if (!def) continue;
       const span = document.createElement("span");
@@ -120,7 +119,6 @@ export function highlightTerms(
       span.setAttribute("aria-label", `defined term: ${entry.display}`);
       pieces.push(text.slice(last, mm.index), span);
       last = mm.index + mm[0].length;
-      if (opts.stoplist.has(entry.term)) seenStop.add(entry.term);
     }
     if (!pieces.length) continue;
     pieces.push(text.slice(last));

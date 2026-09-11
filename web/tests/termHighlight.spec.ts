@@ -59,13 +59,13 @@ describe("buildMatcher + highlightTerms", () => {
     expect(root.querySelectorAll("span[data-def-eid]").length).toBe(0);
   });
 
-  it("stoplist term wrapped once per section, others every time", () => {
+  it("stoplist term never wrapped, others every time", () => {
     const m = buildMatcher([
       T("person", [["d", "sec-1"]]), T("associate", [["d", "sec-1"]]),
     ]);
     const root = mk("<p>A person told a person. An associate saw an associate.</p>");
     highlightTerms(root, m, "sec-1", { stoplist: new Set(["person"]) });
-    expect(root.querySelectorAll("span[data-term='person']").length).toBe(1);
+    expect(root.querySelectorAll("span[data-term='person']").length).toBe(0);
     expect(root.querySelectorAll("span[data-term='associate']").length).toBe(2);
   });
 
