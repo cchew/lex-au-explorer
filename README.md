@@ -9,6 +9,7 @@ Current features:
 
 ## Versions
 
+- v0.4.2: fixes a bad v0.4.1 production deploy that shipped the 2-Act E2E fixture set instead of the real corpus (Corporations Act and Fair Work Act missing from search, Privacy Act showing ~2 fake sections), and a footer version that had been hardcoded and stale since v0.2.0. The footer now reads the version from `package.json` at build time. `npm run build` runs a corpus-size check first and refuses to build against fixture data.
 - v0.4.1: defined-term tooltip now anchors near the hovered term and clamps to the viewport, instead of a fixed offset that could render off-screen on long sections. The tooltip stays open when the mouse moves onto it, so the "Open in Act Alike" link is reachable. Generic STOPLIST terms (act, corporation, etc.) no longer highlight at all, not just after their first occurrence per section.
 - v0.4.0: defined terms are now highlighted where they are *used* in operative provisions, not only at their point of definition. A browser-runtime pass (`web/src/lib/termHighlight.ts`, gated by a reader toggle) builds a surface-form matcher from the Act's body-used terms and wraps matches per rendered section; when a term is defined more than once in an Act the correct definition is chosen client-side by the resolver's nearest-enclosing-scope rule. One-hop cross-Act pointer definitions ("has the same meaning as in the X Act") are inlined in the tooltip with a "via {Act}" line and resolve to an in-corpus section where the target Act is held (about 59% of pointer defs; the rest show the raw pointer text). Terms defined across a comparable number of Acts get an "Open in Act Alike" deep link. The build replaces the per-section `bundle.definitions` map with a `bundle.terms[]` array carrying every defined term the graph has for the Act (about 29% of Acts carry defined terms; bundle size +1.5%). The lex-au AKN corpus is unchanged.
 - v0.3.0: schedules now render in the reader in every shape (numbered clause/subclause units, loose `<paragraph>`/`<table>`/prose runs grouped into synthetic units, clause eId collisions disambiguated with a `~N` suffix, each labelled "Schedule N"). Act long title and enacting words extracted from `<preface>` (heuristic; ~5% of Acts have no extractable long title and show none). Part/Chapter/Division-level introductory text ("head-notes") rendered. Multi-line table cells keep their line breaks (`<br>`). Figures now embed the real image with width/height where the raster exists (the vector-heavy giant tax Acts still placehold where upstream vector-to-raster conversion timed out). Large Acts lazy-load each schedule as a separate file and the reader merges section maps instead of replacing them. Raw AKN XML is served from the `cchew/lex-au` HuggingFace dataset instead of being bundled, reducing `web/dist` from 1.2G to 589M (the 3,076 raw XML copies are no longer written). ref-tally: this run resolved 105,492 of 246,880 ref attempts; the denominator grew by ~100k newly-surfaced schedule cross-references (most unresolved by the suffix-match index), so the ratio is not comparable to prior body-only runs. Residual carve-out: schedule table `<th>` header styling is lost (text intact), schedule Part/Division grouping is flattened (a few labels use the corpus ordinal, not the gazetted number), VML-only images are undetected, and some vector figures are placeheld.
@@ -28,8 +29,15 @@ Vite bundling `public/`) deployed as a pre-built directory.
 
     cd web
     npm run predeploy          # runs the Python build pipeline, writes web/public/data
-    npm run build               # vue-tsc + vite build; bakes public/data into dist/
+    npm run build               # verify-corpus + vue-tsc + vite build; bakes public/data into dist/
     netlify deploy --prod --dir=dist   # deploys the pre-built dist/, no remote build
+
+`web/public/data/` doubles as the real-corpus staging dir (gitignored, written
+by `predeploy`) and 4 git-tracked E2E fixture files (`index.json` among
+them -- 2 fake Acts). Whatever last touched the directory is what `vite
+build` bakes into `dist/`, so `npm run build` runs a corpus-size check
+first and refuses to build (rather than silently shipping the fixture set)
+if `index.json` looks too small -- rerun `npm run predeploy` if it fails.
 
 Reader data is served from `web/public/data` (dev) and `web/dist/data` (prod); there is no `web/data/` - if it exists it is a stale hand-run, delete it.
 

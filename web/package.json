@@ -1,12 +1,13 @@
 {
   "name": "lex-au-explorer-web",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
     "predeploy": "cd .. && .venv/bin/lex-au-explorer-build --corpus-dir ../../lex-au/repo/corpus --graph ../../lex-au-graph/repo/graph.json --out web/public/data --corpus-images ../../lex-au/repo/corpus/images",
-    "build": "vue-tsc --noEmit && vite build",
+    "verify-corpus": "node scripts/verify-corpus-data.mjs",
+    "build": "npm run verify-corpus && vue-tsc --noEmit && vite build",
     "test": "vitest run",
     "test:e2e": "playwright test"
   },
