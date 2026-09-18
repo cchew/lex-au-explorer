@@ -20,6 +20,46 @@ Current features:
 - v0.1.1: fixes section rendering to include subsection/paragraph/authorial-note body text, not just a section's own top-level content (52% of Privacy Act 1988 sections were rendering under 30 chars of body text). Reader now shows a whole TOC group's sections at once with scroll-to-anchor navigation, plus an Act key-info header (title, No., year). Rebranded shell, Umami analytics wired (dormant pending a Website ID).
 - v0.1.0: shell + legislation reader with hover-definitions, section-scoped hover tooltips, source-fidelity panel. Real corpus build verified (3,078 Acts, zero failures).
 
+## Setup
+
+The build pipeline needs a `lex-au` corpus and a `lex-au-graph` definition graph. Get the corpus from Hugging Face (no `lex-au` clone needed):
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+pip install huggingface_hub
+python -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='cchew/lex-au', repo_type='dataset', local_dir='../lex-au-corpus', allow_patterns=['index.json', 'xml/*'])"
+```
+
+Build `lex-au-graph`'s `graph.json` from that corpus (clone [lex-au-graph](https://github.com/cchew/lex-au-graph) as a sibling first):
+
+```bash
+git clone https://github.com/cchew/lex-au-graph.git ../lex-au-graph
+cd ../lex-au-graph
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+lexaugraph build --corpus-dir ../lex-au-corpus
+cd ../lex-au-explorer
+```
+
+Run the build pipeline, then the frontend:
+
+```bash
+lex-au-explorer-build --corpus-dir ../lex-au-corpus --graph ../lex-au-graph/graph.json --out web/data
+
+cd web
+npm install
+npm run dev
+```
+
+## Tests
+
+```bash
+pytest                      # build pipeline
+cd web && npm run test      # unit
+cd web && npm run test:e2e  # Playwright, needs web/data built first
+```
+
 ## Deploy
 
 Netlify does not run the build: its build container has neither the sibling
