@@ -55,11 +55,14 @@ _HEADNOTE_BLOCK_TAGS = {"content", "p", "blockList", "table"}
 # `grep -ohE 'eId="[^"]*"' corpus/xml/*.xml | grep -c '~'` -> 0), and is a
 # safe HTML `id` attribute character and dict key.
 #
-# A converter-side fix (B4, targeted lex-au v0.10.0, not yet shipped) will
-# collapse most of these collisions upstream; once it lands, this
-# disambiguator becomes largely redundant (harmless to leave in) rather than
-# the primary mitigation, and `_schedule_units`/`build_toc` below may need
-# updating to walk B4's new schedule nesting -- tracked as Task 22.
+# The converter-side fix (B4) is already shipped and live in the corpus this
+# repo builds from -- lex-au commits b88624a..c71da41, folded into the full
+# re-convert at 78ea173 (a confirmed ancestor of 434a672, the current main).
+# Only lex-au's package version string and the v0.10.0 git tag are still
+# pending (a release formality, not a corpus gap). This disambiguator is now
+# largely redundant (harmless to leave in) rather than the primary
+# mitigation, and `_schedule_units`/`build_toc` below still need updating to
+# walk B4's new schedule nesting -- tracked as Task 22, unblocked, not done.
 _EID_DISAMBIG = "~"
 
 # Label for a synthetic schedule "block" unit -- a run of loose siblings
