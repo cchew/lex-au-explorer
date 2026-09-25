@@ -7,6 +7,8 @@ Current features:
 1. Browse Commonwealth legislation with hover-definitions for defined terms
 2. Source-fidelity panel with a build-time currency check against legislation.gov.au ("verified DATE: current compilation" / "a newer compilation now exists" / "repealed since this snapshot")
 
+lex-au-explorer renders the Commonwealth corpus word-for-word for body text. Footnotes in 6 international-instrument schedules are a named carve-out (see `../lex-au/repo/docs/known-limitations-schedule-and-conversion.txt`, entry (f), and `FUTURE.md`).
+
 ## Versions
 
 - v0.4.2: fixes a bad v0.4.1 production deploy that shipped the 2-Act E2E fixture set instead of the real corpus (Corporations Act and Fair Work Act missing from search, Privacy Act showing ~2 fake sections), and a footer version that had been hardcoded and stale since v0.2.0. The footer now reads the version from `package.json` at build time. `npm run build` runs a corpus-size check first and refuses to build against fixture data.

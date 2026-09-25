@@ -42,13 +42,24 @@ _STRUCTURAL_TAGS = {
 _HEADNOTE_CONTAINER_TAGS = _STRUCTURAL_TAGS - {"section"}
 _HEADNOTE_BLOCK_TAGS = {"content", "p", "blockList", "table"}
 
-# Disambiguator for colliding schedule-unit eIds (Task 4). The converter
-# flattens schedule Part/Division numbering, so a schedule can legitimately
-# contain two distinct <clause> elements sharing one eId (see
-# tests/fixtures/corpus/sched-dup-eid.xml and ../lex-au/repo/FUTURE.md). "~"
-# does not occur in any eId in the lex-au corpus (verified via
+# Disambiguator for colliding schedule-unit eIds (Task 4). Two distinct
+# <clause> elements can legitimately share one eId -- corrected understanding
+# (2026-09-26, ../lex-au/repo/FUTURE.md, P1 investigation note in the EA
+# project wrapper): this is ~99% _CLAUSE_RE / SECTION-branch false-positive
+# clause fabrication from amendment-instruction items, embedded schedule
+# TOCs, and un-wrapped quoted/inserted provisions in the converter, not lost
+# source Part/Division grouping (that accounts for only ~1.2% of collisions;
+# there is no source AKN to begin with -- the source is DOCX). See
+# tests/fixtures/corpus/sched-dup-eid.xml. "~" does not occur in any eId in
+# the lex-au corpus (verified via
 # `grep -ohE 'eId="[^"]*"' corpus/xml/*.xml | grep -c '~'` -> 0), and is a
 # safe HTML `id` attribute character and dict key.
+#
+# A converter-side fix (B4, targeted lex-au v0.10.0, not yet shipped) will
+# collapse most of these collisions upstream; once it lands, this
+# disambiguator becomes largely redundant (harmless to leave in) rather than
+# the primary mitigation, and `_schedule_units`/`build_toc` below may need
+# updating to walk B4's new schedule nesting -- tracked as Task 22.
 _EID_DISAMBIG = "~"
 
 # Label for a synthetic schedule "block" unit -- a run of loose siblings
