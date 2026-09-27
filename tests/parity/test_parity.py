@@ -27,6 +27,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import lxml.etree as ET
+import pytest
 
 from build.bundle import build_preface, build_sections
 from build.parse import parse_section
@@ -625,30 +626,18 @@ def test_real_figure_renders_img_not_placeholder() -> None:
     ), "expected a real /data/images/ <img src>, got: " + html
 
 
-def test_eid_collision_act_keeps_both_clause_30() -> None:
-    """Check 7: two distinct `<clause>` elements share eId
-    `schedule-1__clause-30`; `build_sections` (`_add_entry`) must keep both --
-    the second disambiguated to `schedule-1__clause-30~2` -- with no content
-    cross-contamination. Fixture reused: `sched-dup-eid.xml` (Task 4). Overlaps
-    `tests/test_bundle.py` deliberately: this is the parity-harness angle."""
+def test_eid_collision_act_raises_converter_regression() -> None:
+    """Check 7 (Task 22 update): two distinct `<clause>` elements sharing eId
+    `schedule-1__clause-30` used to be silently kept apart via a `~2` suffix
+    (Task 4). lex-au v0.10.0's B4 fix eliminates this collision at the
+    converter, so `build_sections` (`_add_entry`) must now raise instead --
+    a duplicate reaching it can only mean a converter regression. Fixture
+    reused: `sched-dup-eid.xml` (Task 4), which documents the pre-B4 bug.
+    Overlaps `tests/test_bundle.py` deliberately: this is the parity-harness
+    angle."""
     root = ET.parse(str(_FIXTURES / "sched-dup-eid.xml")).getroot()
-    sections, counts = build_sections(root, _ref_index_for(root))
-
-    assert "schedule-1__clause-30" in sections
-    assert "schedule-1__clause-30~2" in sections
-    assert counts["disambiguated_eids"] == 1
-    first = sections["schedule-1__clause-30"]["html"]
-    second = sections["schedule-1__clause-30~2"]["html"]
-    assert first != second, "the two clause-30 entries rendered identically"
-
-    first_text = _sections_text(sections, "schedule-1__clause-30")
-    second_text = _sections_text(sections, "schedule-1__clause-30~2")
-    # Distinctive phrase from the position-63 "Standard rate" clause.
-    assert "worked out using the following table" in first_text
-    assert "worked out using the following table" not in second_text
-    # Distinctive phrase from the position-96 definitions clause.
-    assert "has the same meaning as in" in second_text
-    assert "has the same meaning as in" not in first_text
+    with pytest.raises(AssertionError, match="schedule-1__clause-30"):
+        build_sections(root, _ref_index_for(root))
 
 
 def test_extract_docx_importable() -> None:

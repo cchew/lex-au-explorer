@@ -1,0 +1,77 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<akomaNtoso xmlns="http://docs.oasis-open.org/legaldocml/ns/akn/3.0">
+  <act name="act">
+    <!-- Trimmed real-corpus fixture (lex-au-explorer Task 22). Source:
+    lex-au/repo/corpus/xml/agricultural-and-veterinary-chemicals-legislation-
+    amendment-act-2013.xml, schedule-1 ("Approvals, registrations, permits and
+    licences"). This is the v0.10.0 B4 amending-schedule shape (lex-au Task 6):
+    every direct schedule child is one <hcontainer name="amendedAct"> grouping
+    wrapper (the B1 increment), and every amendment instruction is an
+    <hcontainer name="item"> leaf, not the pre-B4 flat <hcontainer
+    name="clause">. item-1 and item-2 also carry a <quotedStructure> (an
+    inserted/substituted provision) —item-1's wraps a bare <division>
+    (no operative text of its own), item-2's wraps a real <section> with one
+    trimmed <subsection>/<paragraph> (trimmed from the source's 2 subsections
+    / 13 paragraphs, keeping one real nested provision so the recursion and
+    rendering can both be checked). item-3 has no <quotedStructure> at all (a
+    plain repeal instruction) —the third, no-quoted-content leaf shape.
+    Kept: exactly 3 of the source amdact-1's 11 items, in original document
+    order, un-renumbered (their eIds are the real corpus eIds). Dropped: the
+    other 8 items, all other amendedAct wrappers in the source schedule, and
+    <meta>/<identification> (irrelevant to bundle-stage tests). -->
+    <attachments>
+      <attachment>
+        <hcontainer name="schedule" eId="schedule-1">
+          <num>1</num>
+          <heading>Approvals, registrations, permits and licences</heading>
+          <hcontainer name="amendedAct" eId="schedule-1__amdact-1"><heading>Agricultural and Veterinary Chemicals Code Act 1994</heading><hcontainer name="item" eId="schedule-1__amdact-1__item-1">
+              <num>1</num>
+              <heading>Before section 1 of the Code set out in the Schedule</heading>
+              <content>
+                <p>Insert:</p>
+              </content>
+              <quotedStructure eId="schedule-1__amdact-1__item-1__qstr-1" startQuote="&#8220;" endQuote="&#8221;" from="#" to="#">
+                <division eId="schedule-1__amdact-1__item-1__qstr-1__dvs-1">
+                  <num>1</num>
+                  <heading>Object, definitions etc.</heading>
+                </division>
+              </quotedStructure>
+            </hcontainer>
+            <hcontainer name="item" eId="schedule-1__amdact-1__item-2">
+              <num>2</num>
+              <heading>After section 1 of the Code set out in the Schedule</heading>
+              <content>
+                <p>Insert:</p>
+              </content>
+              <quotedStructure eId="schedule-1__amdact-1__item-2__qstr-1" startQuote="&#8220;" endQuote="&#8221;" from="#" to="#">
+                <section eId="schedule-1__amdact-1__item-2__qstr-1__sec-1A">
+                  <num>1A</num>
+                  <heading>Implementing the Code</heading>
+                  <subsection eId="schedule-1__amdact-1__item-2__qstr-1__sec-1A__subsec-1">
+                    <num>1</num>
+                    <content>
+                      <p>This Code recognises that:</p>
+                    </content>
+                    <paragraph eId="schedule-1__amdact-1__item-2__qstr-1__sec-1A__subsec-1__para-a">
+                      <num>a</num>
+                      <content>
+                        <p>the furthering of trade and commerce between Australia and places outside Australia; and</p>
+                      </content>
+                    </paragraph>
+                    </subsection>
+                  </section>
+              </quotedStructure>
+            </hcontainer>
+            <hcontainer name="item" eId="schedule-1__amdact-1__item-3">
+              <num>3</num>
+              <heading>Subsection 3(1) of the Code set out in the Schedule (definition of acknowledge)</heading>
+              <content>
+                <p>Repeal the definition.</p>
+              </content>
+            </hcontainer>
+            </hcontainer>
+        </hcontainer>
+      </attachment>
+    </attachments>
+  </act>
+</akomaNtoso>

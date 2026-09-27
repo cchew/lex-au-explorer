@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Optional
 
 import lxml.etree as ET
+import pytest
 
 from build.bundle import (
     AKN,
@@ -212,83 +213,125 @@ def test_build_sections_does_not_mutate_schedule_source_tree() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# eId-collision disambiguation -- Task 4
+# eId collisions are now a converter regression, not something to paper over
+# -- Task 22 (B4 shipped in lex-au v0.10.0, converter-side, eliminates the
+# collisions the old ~N disambiguator (Task 4) existed to paper over: see
+# bundle.py's module-level comment above `_SCHEDULE_LEAF_NAMES`). The three
+# former disambiguation tests (`test_duplicate_clause_eids_both_kept`,
+# `test_disambiguated_unit_has_unique_dom_id`,
+# `test_build_toc_agrees_with_bundle_on_disambiguated_keys`) are replaced by
+# the two assertion tests below: a duplicate eId reaching bundle assembly is
+# now a loud failure, not a silently-suffixed key.
 # --------------------------------------------------------------------------- #
 
 
-def test_duplicate_clause_eids_both_kept() -> None:
-    """Real-corpus regression: the converter flattens schedule Part/Division
-    numbering so a-new-tax-system-(family-assistance)-act-1999's schedule-1
-    has two distinct <clause eId="schedule-1__clause-30"> elements (see the
-    fixture's header comment). Both must survive in ``sections`` -- silently
-    overwriting the first with the second is permanent content loss."""
+def test_duplicate_schedule_eid_raises_in_build_sections() -> None:
+    """sched-dup-eid.xml documents the pre-B4 converter bug (two distinct
+    <clause eId="schedule-1__clause-30"> elements -- see the fixture's header
+    comment) that lex-au v0.10.0's B4 fix eliminates at the source. Post-B4,
+    a duplicate reaching `_add_entry` can only mean a converter regression,
+    not a case to disambiguate around -- `build_sections` must raise, not
+    silently keep both under a suffixed key."""
     root = _parse_corpus("sched-dup-eid.xml")
     ix = build_ref_index(_all_nav_eids(root))
-    sections, counts = build_sections(root, ix)
-
-    assert "schedule-1__clause-30" in sections
-    assert "schedule-1__clause-30~2" in sections
-    assert sections["schedule-1__clause-30"]["html"] != sections["schedule-1__clause-30~2"]["html"]
-    assert "Standard rate" not in sections["schedule-1__clause-30~2"]["html"]
-    assert "June 2000 rate" in sections["schedule-1__clause-30~2"]["heading"]
-    assert counts["disambiguated_eids"] == 1
-
-    # invariant: one bundle key per source clause/unit (clause-30, clause-31,
-    # clause-39, clause-30~2 -- no loose top-level content in this fixture).
-    n_units = len(_schedule_units(
-        next(root.iterfind(f".//{AKN}attachments/{AKN}attachment/{AKN}hcontainer[@name='schedule']"))
-    ))
-    assert n_units == 4
-    assert len([k for k in sections if k.startswith("schedule-1")]) == n_units
+    with pytest.raises(AssertionError, match="schedule-1__clause-30"):
+        build_sections(root, ix)
 
 
-def test_disambiguated_unit_has_unique_dom_id() -> None:
-    """id-reachability, adjusted to how the reader actually resolves eIds
-    (verified against web/src/views/ReaderView.vue): the DOM id a top-level
-    bundle unit is reached by is `:id="s.eid"` on a wrapper the Vue app
-    renders around `section.html` from the bundle's own dict key -- never an
-    id baked inside `section.html` itself. `render_section`'s "section" kind
-    (what a whole schedule clause/block parses to at the top level, see
-    `parse_section`) never stamps its own eid as an `id=` attribute in the
-    first place (only nested "provision" descendants do, via
-    `HtmlStyleMap._provision`), so there is nothing of the *outer* clause's
-    own eid to rewrite -- `_add_entry`'s ``html.replace`` is a correct,
-    harmless no-op for every unit in this corpus, not a bug. What actually
-    matters, and is checked here, is that a disambiguated unit's *own* nested
-    provisions keep rendering correctly (their ids never collide with the
-    outer clause's eid -- child eids always extend the parent's with a
-    ``__`` segment, so they can't literally equal it) and that the two
-    colliding units' html never cross-contaminate."""
+def test_duplicate_schedule_eid_raises_in_build_toc() -> None:
+    """Same converter-regression guard, TOC side: build_toc must not silently
+    disambiguate a duplicate schedule-unit eId into a second TOC child either
+    -- the two entry points must fail the same way on the same bad input."""
     root = _parse_corpus("sched-dup-eid.xml")
-    ix = build_ref_index(_all_nav_eids(root))
-    sections, _ = build_sections(root, ix)
-
-    html2 = sections["schedule-1__clause-30~2"]["html"]
-    assert 'id="schedule-1__clause-30__subclause-2"' in html2
-    assert 'id="schedule-1__clause-30"' not in html2
-    assert "Standard rate" not in html2  # not cross-contaminated with unit 1
-    assert "has the same meaning as" in html2
+    with pytest.raises(AssertionError, match="schedule-1__clause-30"):
+        build_toc(root)
 
 
-def test_build_toc_agrees_with_bundle_on_disambiguated_keys() -> None:
-    """build_toc's schedule-children list must list the same disambiguated
-    keys build_sections actually used for `sections` -- otherwise the TOC and
-    the bundle disagree about what eIds exist."""
-    root = _parse_corpus("sched-dup-eid.xml")
-    ix = build_ref_index(_all_nav_eids(root))
-    sections, _ = build_sections(root, ix)
+# --------------------------------------------------------------------------- #
+# B4 schedule nesting (<hcontainer name="amendedAct"> / "item" wrappers,
+# <quotedStructure> inserted provisions) -- Task 22
+# --------------------------------------------------------------------------- #
 
+
+def test_schedule_units_recurses_through_b4_amended_act_wrapper() -> None:
+    """sched-b4-nested.xml's schedule-1 has ONE direct child: an
+    <hcontainer name="amendedAct"> wrapping 3 <hcontainer name="item">
+    amendment instructions (the real v0.10.0 B4 shape -- see the fixture's
+    header comment). `_schedule_units` must not flatten this into one opaque
+    "block" run (the pre-Task-22 bug this task fixes): it must yield exactly
+    one "group" unit for the wrapper, and recursing into that group's own
+    nested units must yield the 3 items in document order."""
+    sched = next(
+        _parse_corpus("sched-b4-nested.xml").iterfind(
+            f".//{AKN}attachments/{AKN}attachment/{AKN}hcontainer[@name='schedule']"
+        )
+    )
+    units = _schedule_units(sched)
+    assert len(units) == 1
+    kind, group_el, nested = units[0]
+    assert kind == "group"
+    assert group_el.get("eId") == "schedule-1__amdact-1"
+
+    assert [u[0] for u in nested] == ["item", "item", "item"]
+    assert [u[1].get("eId") for u in nested] == [
+        "schedule-1__amdact-1__item-1",
+        "schedule-1__amdact-1__item-2",
+        "schedule-1__amdact-1__item-3",
+    ]
+
+
+def test_build_toc_nests_b4_schedule_groups_and_items() -> None:
+    """The TOC must expose a real tree for a B4 schedule: the schedule node's
+    one child is the amendedAct group, and that group's own children are the
+    3 items -- not 3 direct schedule children (flat) and not 0 children
+    (the pre-Task-22 collapse). No `~N` disambiguator suffix appears
+    anywhere: B4 schedules have no colliding eIds to disambiguate."""
+    root = _parse_corpus("sched-b4-nested.xml")
     toc = build_toc(root)
     sched_node = next(n for n in toc if n["eid"] == "schedule-1")
-    toc_eids = [c["eid"] for c in sched_node["children"]]
 
-    assert toc_eids == [
-        "schedule-1__clause-30",
-        "schedule-1__clause-31",
-        "schedule-1__clause-39",
-        "schedule-1__clause-30~2",
+    assert len(sched_node["children"]) == 1
+    group_node = sched_node["children"][0]
+    assert group_node["eid"] == "schedule-1__amdact-1"
+    assert group_node["heading"] == "Agricultural and Veterinary Chemicals Code Act 1994"
+
+    item_eids = [c["eid"] for c in group_node["children"]]
+    assert item_eids == [
+        "schedule-1__amdact-1__item-1",
+        "schedule-1__amdact-1__item-2",
+        "schedule-1__amdact-1__item-3",
     ]
-    assert set(toc_eids) == {k for k in sections if k.startswith("schedule-1")}
+    assert group_node["children"][1]["heading"].startswith("2 ")
+    assert not any("~" in eid for eid in item_eids)
+
+
+def test_build_sections_renders_each_b4_item_as_its_own_entry() -> None:
+    """Each item is its own navigable bundle entry (its own key, its own
+    heading) -- not one item's content merged into a sibling's, and not the
+    whole amendedAct group collapsed into a single "Introductory text" blob
+    (the exact defect Task 21's triage found in the live corpus). item-2's
+    entry must contain its <quotedStructure>'s nested <section>/<subsection>/
+    <paragraph> prose, proving the recursion still renders a quoted
+    provision's real content, not just the item's own instruction text."""
+    root = _parse_corpus("sched-b4-nested.xml")
+    ix = build_ref_index(_all_nav_eids(root))
+    sections, _ = build_sections(root, ix)
+
+    assert set(sections) == {
+        "schedule-1__amdact-1__item-1",
+        "schedule-1__amdact-1__item-2",
+        "schedule-1__amdact-1__item-3",
+    }
+    assert sections["schedule-1__amdact-1__item-1"]["heading"] == (
+        "1 Before section 1 of the Code set out in the Schedule"
+    )
+    item2_html = sections["schedule-1__amdact-1__item-2"]["html"]
+    assert "furthering of trade and commerce" in item2_html
+    item3_html = sections["schedule-1__amdact-1__item-3"]["html"]
+    assert "Repeal the definition" in item3_html
+    # item-3 has no <quotedStructure> at all -- confirms the no-quoted-content
+    # leaf shape renders fine too, not just the two quoted-provision items.
+    assert "furthering of trade and commerce" not in item3_html
 
 
 def test_build_toc_skips_eidless_schedule_clause_like_build_sections_does() -> None:
@@ -319,16 +362,22 @@ def test_build_toc_skips_eidless_schedule_clause_like_build_sections_does() -> N
 
 
 def test_schedule_unit_count_equals_bundle_key_count() -> None:
-    """Task 3/4 invariant: every unit ``_schedule_units`` yields for a
-    schedule lands under exactly one distinct bundle key. This is the
-    regression guard for a collision silently collapsing two units into one
-    key (proven to fail if ``_add_entry``'s collision branch is removed --
-    see task-4-report.md)."""
+    """Task 3/4 invariant: every FLAT (no group nesting) unit
+    ``_schedule_units`` yields for a schedule lands under exactly one
+    distinct bundle key. This is the regression guard for a collision
+    silently collapsing two units into one key (proven to fail if
+    ``_add_entry``'s collision branch is removed -- see task-4-report.md).
+
+    ``sched-dup-eid.xml`` is deliberately excluded (Task 22): it now raises
+    (see ``test_duplicate_schedule_eid_raises_in_build_sections``), and a
+    schedule with B4 group nesting (``sched-b4-nested.xml``) breaks this
+    invariant's flat premise by design -- ``_schedule_units`` returns 1
+    top-level ("group") unit for 3 leaf bundle keys, so it is checked by its
+    own dedicated tests above, not folded into this loop."""
     for fixture in (
         "sched-clause.xml",
         "sched-paragraphs.xml",
         "sched-table.xml",
-        "sched-dup-eid.xml",
     ):
         root = _parse_corpus(fixture)
         ix = build_ref_index(_all_nav_eids(root))
@@ -624,3 +673,38 @@ def test_build_toc_skips_headnote_for_eidless_container_like_build_sections() ->
     part_node = toc[0]
     assert part_node["eid"] == ""
     assert [c["eid"] for c in part_node["children"]] == ["s1"]
+
+
+def test_duplicate_headnote_key_is_disambiguated_not_asserted() -> None:
+    """Task 22 regression guard: a body-level container eId collision (two
+    ``<part>``s sharing one number at different locations in the SAME Act's
+    body) is a real, ongoing, legitimate real-corpus shape -- confirmed
+    against the live v0.10.0 corpus (Task 22's full-corpus predeploy run hit
+    exactly this on ``public-service-reform-act-1984.xml``, which has two
+    literal ``<part eId="part-VII">`` elements directly under ``<body>``; see
+    also ``build/cli.py``'s ``_write_split_bundle`` comment on Corp Act's two
+    ``chapter-7``s and ITAA-97's repeated ``chapter-2``/``chapter-3``). This
+    is unrelated to B4 (which only touches schedule content), so it must
+    keep the pre-Task-22 ``~2`` suffix behaviour -- NOT the new
+    schedule-unit assertion -- or a real Act's second head-note silently
+    overwrites the first's, permanently losing content."""
+    root = ET.fromstring(
+        f'<akomaNtoso xmlns="{AKN[1:-1]}"><act><body>'
+        f'<part eId="part-VII">'
+        f"<content><p>First VII head-note.</p></content>"
+        f'<section eId="part-VII__sec-1"><num>1</num><heading>A</heading>'
+        f"<content><p>body</p></content></section>"
+        f"</part>"
+        f'<part eId="part-VII">'
+        f"<content><p>Second VII head-note.</p></content>"
+        f'<section eId="part-VII__sec-2"><num>2</num><heading>B</heading>'
+        f"<content><p>body</p></content></section>"
+        f"</part>"
+        f"</body></act></akomaNtoso>"
+    )
+    sections, _ = build_sections(root, build_ref_index(_all_nav_eids(root)))
+
+    assert "part-VII__head" in sections
+    assert "part-VII__head~2" in sections
+    assert "First VII head-note" in sections["part-VII__head"]["html"]
+    assert "Second VII head-note" in sections["part-VII__head~2"]["html"]

@@ -27,7 +27,10 @@ _NAV_TAGS: frozenset[str] = frozenset(
         "subsection", "paragraph", "subparagraph",
     }
 )
-_NAV_HCONTAINER_NAMES: frozenset[str] = frozenset({"clause", "subclause"})
+# "item" added Task 22: a B4 amendment-instruction item (lex-au v0.10.0) is a
+# navigable schedule-unit leaf exactly like "clause" -- see
+# build.bundle._SCHEDULE_LEAF_NAMES.
+_NAV_HCONTAINER_NAMES: frozenset[str] = frozenset({"clause", "subclause", "item"})
 
 _TALLY_KEYS: tuple[str, ...] = ("resolved", "ambiguous", "unresolved")
 
@@ -38,9 +41,11 @@ _SCHEDULE_SPLIT_BYTES = 512 * 1024  # per-Act schedule html budget
 
 # ``_collect_section_eids`` keeps a TOC eId whose last ``__``-separated segment
 # starts with any of these (body sections plus the schedule clause / subclause
-# / between-clause block units from Task 3).
+# / between-clause block units from Task 3; "item-" added Task 22 for B4
+# amendment-instruction items -- without it a split-by-part Act's schedule
+# items would be silently dropped from every per-Part bundle file).
 _KEEP_LAST_SEGMENT_PREFIXES: tuple[str, ...] = (
-    "sec-", "clause-", "subclause-", "block-",
+    "sec-", "clause-", "subclause-", "block-", "item-",
 )
 
 app = typer.Typer()

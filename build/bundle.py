@@ -42,28 +42,63 @@ _STRUCTURAL_TAGS = {
 _HEADNOTE_CONTAINER_TAGS = _STRUCTURAL_TAGS - {"section"}
 _HEADNOTE_BLOCK_TAGS = {"content", "p", "blockList", "table"}
 
-# Disambiguator for colliding schedule-unit eIds (Task 4). Two distinct
-# <clause> elements can legitimately share one eId -- corrected understanding
-# (2026-09-26, ../lex-au/repo/FUTURE.md, P1 investigation note in the EA
-# project wrapper): this is ~99% _CLAUSE_RE / SECTION-branch false-positive
-# clause fabrication from amendment-instruction items, embedded schedule
-# TOCs, and un-wrapped quoted/inserted provisions in the converter, not lost
-# source Part/Division grouping (that accounts for only ~1.2% of collisions;
-# there is no source AKN to begin with -- the source is DOCX). See
-# tests/fixtures/corpus/sched-dup-eid.xml. "~" does not occur in any eId in
-# the lex-au corpus (verified via
+# Disambiguator, now used for exactly TWO collision axes, both unrelated to
+# B4 / schedule-unit content (Task 22 removed the THIRD, schedule-unit axis
+# that used to share this suffix -- see ``_SCHEDULE_LEAF_NAMES``'s comment
+# below, and ``_add_headnote_entry``'s docstring for why one axis survives in
+# THIS module):
+#
+# 1. A WITHIN-UNIT duplicate id (repeated ``para-a``/``para-b`` siblings
+#    sharing an eid one level below a single clause/item) -- handled by
+#    :func:`build.parse._dedupe_eids`, which imports this constant so the two
+#    surviving axes agree on notation.
+# 2. A body-level container head-note key collision (two ``<part>``/
+#    ``<chapter>``/... elements sharing one number at different locations in
+#    the SAME Act's body -- e.g. Corp Act's two ``chapter-7``s, ITAA-97's
+#    repeated ``chapter-2``/``chapter-3``, see ``build/cli.py``'s
+#    ``_write_split_bundle`` comment) -- handled by
+#    :func:`_add_headnote_entry` below. Real, still-occurring, and entirely
+#    unrelated to schedule content: B4 only touched how a schedule's OWN
+#    content is structured, never body Part/Chapter numbering.
+#
+# "~" does not occur in any eId in the lex-au corpus (verified via
 # `grep -ohE 'eId="[^"]*"' corpus/xml/*.xml | grep -c '~'` -> 0), and is a
 # safe HTML `id` attribute character and dict key.
-#
-# The converter-side fix (B4) is already shipped and live in the corpus this
-# repo builds from -- lex-au commits b88624a..c71da41, folded into the full
-# re-convert at 78ea173 (a confirmed ancestor of 434a672, the current main).
-# Only lex-au's package version string and the v0.10.0 git tag are still
-# pending (a release formality, not a corpus gap). This disambiguator is now
-# largely redundant (harmless to leave in) rather than the primary
-# mitigation, and `_schedule_units`/`build_toc` below still need updating to
-# walk B4's new schedule nesting -- tracked as Task 22, unblocked, not done.
 _EID_DISAMBIG = "~"
+
+# Schedule-unit leaf tags: a real ``<hcontainer name="clause">`` (plain,
+# non-amending schedule) or ``<hcontainer name="item">`` (a B4
+# amendment-instruction item -- lex-au v0.10.0). Both are navigable,
+# individually-rendered bundle units.
+_SCHEDULE_LEAF_NAMES = frozenset({"clause", "item"})
+
+# Schedule-unit GROUPING wrapper tags (Task 22, B4's B1 increment): a real
+# Part/Division/Chapter/subDivision boundary inside a schedule, or an
+# ``amendedAct`` citation boundary (the amended Act's own name, heading-only,
+# introducing a run of ``item``s). Each wraps a further run of leaf units,
+# nested groups, and/or loose content -- ``_schedule_units`` recurses into
+# these; they are TOC branch nodes with no bundle entry of their own (unless
+# they carry loose lead-in content, which becomes a "block" unit exactly like
+# the schedule's own top level -- see ``_schedule_units``'s docstring).
+_SCHEDULE_GROUP_NAMES = frozenset(
+    {"chapter", "part", "division", "subDivision", "amendedAct"}
+)
+
+# Collision history (why there is no disambiguator here any more): pre-B4,
+# ~99% of schedule-unit eId collisions were `_CLAUSE_RE` / SECTION-branch
+# false-positive clause fabrication from amendment-instruction items,
+# embedded schedule TOCs, and un-wrapped quoted/inserted provisions in the
+# converter -- not lost source Part/Division grouping (~1.2%; there is no
+# source AKN to begin with, the source is DOCX). See
+# tests/fixtures/corpus/sched-dup-eid.xml, which now documents that pre-B4
+# bug as a regression fixture rather than a case to paper over.
+#
+# The converter-side fix (B4) is shipped and live in the corpus this repo
+# builds from -- lex-au commits b88624a..c71da41, folded into the full
+# re-convert and released as v0.10.0 (2026-09-26). A schedule-unit eId
+# collision reaching `_add_entry` today can therefore only mean a converter
+# regression, not a case needing a suffixed key -- `_add_entry` and
+# `build_toc`'s schedule walk both assert instead of disambiguating.
 
 # Label for a synthetic schedule "block" unit -- a run of loose siblings
 # (paragraph / table / content / p) that ``_schedule_units`` groups between (or
@@ -103,29 +138,43 @@ def _local_tag(el: ET._Element) -> str:
     return el.tag.split("}")[-1] if isinstance(el.tag, str) else ""
 
 
-def _schedule_units(sched: ET._Element) -> list:
-    """Walk one schedule's direct children in document order (Task 3, B1).
+def _schedule_units(container: ET._Element) -> list:
+    """Walk one schedule (or one schedule-scoped grouping wrapper)'s direct
+    children in document order (Task 3, B1; recursion added Task 22).
 
-    Returns an ordered list of ``("clause", clause_el)`` tuples for a real
-    ``<hcontainer name="clause">``, or ``("block", key, run_elements)``
-    tuples for a run of loose siblings (``paragraph`` / ``table`` /
-    ``content`` / ``p`` / anything else that isn't the schedule's own
-    ``<num>``/``<heading>``) grouped between clauses.
+    Returns an ordered list of:
+
+    - ``(name, el)`` for a real leaf unit -- ``name`` is the element's own
+      ``hcontainer`` ``name`` (``"clause"`` for a plain, non-amending
+      schedule; ``"item"`` for a B4 amendment-instruction item).
+    - ``("group", el, nested_units)`` for a grouping wrapper
+      (``chapter``/``part``/``division``/``subDivision``/``amendedAct`` --
+      see ``_SCHEDULE_GROUP_NAMES``) -- ``nested_units`` is this same
+      function's result for ``el``'s own children, so a caller recurses by
+      simply calling itself on the third tuple element.
+    - ``("block", key, run_elements)`` for a run of loose siblings
+      (``paragraph`` / ``table`` / ``content`` / ``p`` / anything else that
+      isn't ``container``'s own ``<num>``/``<heading>``) grouped between
+      leaf/group units.
 
     This is the single ordered walk both ``build_toc`` and ``build_sections``
     consume, so schedule navigation and schedule rendering can never list
     units in different orders or under different keys.
 
-    Key selection: a schedule with **no** clause anywhere keys its one run
-    (there can only be one, since nothing else triggers a flush) with the
-    bare schedule eId. Any schedule that has at least one clause keys every
-    run (pre-clause, between-clause, or trailing) as
-    ``f"{sched_eid}__block-{n}"`` -- ``had_clause`` is a fixed, whole-schedule
-    fact decided up front, not "seen a clause yet in the walk so far".
+    Key selection: a container with **no** leaf or group child anywhere keys
+    its one run (there can only be one, since nothing else triggers a flush)
+    with ``container``'s own bare eId. A container with at least one leaf or
+    group child keys every run (leading, between, or trailing) as
+    ``f"{container_eid}__block-{n}"`` -- ``had_leaf_or_group`` is a fixed,
+    whole-container fact decided up front, not "seen one yet in the walk so
+    far". This rule is applied uniformly at every nesting depth (the
+    schedule itself, and every grouping wrapper inside it).
     """
-    sched_eid = sched.get("eId", "") or ""
-    had_clause = any(
-        _local_tag(c) == "hcontainer" and c.get("name") == "clause" for c in sched
+    container_eid = container.get("eId", "") or ""
+    had_leaf_or_group = any(
+        _local_tag(c) == "hcontainer"
+        and c.get("name") in (_SCHEDULE_LEAF_NAMES | _SCHEDULE_GROUP_NAMES)
+        for c in container
     )
     units: list = []
     run: list[ET._Element] = []
@@ -136,25 +185,107 @@ def _schedule_units(sched: ET._Element) -> list:
         if not run:
             return
         key = (
-            f"{sched_eid}__block-{block_n}"
-            if had_clause or block_n > 0
-            else sched_eid
+            f"{container_eid}__block-{block_n}"
+            if had_leaf_or_group or block_n > 0
+            else container_eid
         )
         units.append(("block", key, run))
         block_n += 1
         run = []
 
-    for child in sched:
+    for child in container:
         tag = _local_tag(child)
-        if tag == "hcontainer" and child.get("name") == "clause":
+        name = child.get("name")
+        if tag == "hcontainer" and name in _SCHEDULE_LEAF_NAMES:
             flush()
-            units.append(("clause", child))
+            units.append((name, child))
+        elif tag == "hcontainer" and name in _SCHEDULE_GROUP_NAMES:
+            flush()
+            units.append(("group", child, _schedule_units(child)))
         elif tag in ("num", "heading"):
             continue
         else:
             run.append(child)
     flush()
     return units
+
+
+def _schedule_toc_children(
+    container_eid: str, units: list, used: set[str]
+) -> list[dict]:
+    """Recursive TOC-child builder for one schedule (or one grouping
+    wrapper)'s unit list from :func:`_schedule_units` (Task 22).
+
+    ``used`` accumulates every key emitted across the WHOLE schedule (shared
+    across all recursion levels, never reset per group) -- the same
+    collision domain :func:`_add_entry` checks against (a document-global
+    dict), so a schedule-unit eId collision anywhere in the schedule is
+    caught the same way regardless of nesting depth (see the module-level
+    comment above ``_SCHEDULE_GROUP_NAMES``: this is now an assertion, not a
+    disambiguation).
+    """
+    children: list[dict] = []
+    for unit in units:
+        kind = unit[0]
+        if kind == "group":
+            _, group_el, nested_units = unit
+            group_eid = group_el.get("eId", "")
+            if not group_eid:
+                continue
+            children.append(
+                {
+                    "eid": group_eid,
+                    "heading": _numbered_heading(group_el),
+                    "children": _schedule_toc_children(group_eid, nested_units, used),
+                }
+            )
+        elif kind == "block":
+            _, key, _run = unit
+            assert key not in used, (
+                f"duplicate schedule TOC eid {key!r} -- a schedule-unit eId "
+                "collision should not reach the TOC after lex-au v0.10.0's "
+                "B4 fix; this indicates a converter regression"
+            )
+            used.add(key)
+            # A no-leaf container's single whole-run keys under its own bare
+            # eId (see _schedule_units). That would make a TOC child whose
+            # ``eid`` is identical to its parent node's -- a redundant,
+            # self-referential nav row (361 such cases in the corpus at the
+            # schedule level) and an ambiguous ``getElementById`` target. The
+            # parent node itself already navigates there (the reader's
+            # ``flattenLeafEids`` falls back to ``[node.eid]`` for a
+            # childless node), and ``build_sections`` still writes the
+            # bundle entry under this key, so suppress only the duplicate
+            # child row.
+            if key == container_eid:
+                continue
+            # Synthetic (loose-prose) block units have no <num>/<heading> of
+            # their own; give them one consistent short label so the reader
+            # never renders a blank clickable TOC row.
+            children.append(
+                {"eid": key, "heading": _SCHEDULE_BLOCK_LABEL, "children": []}
+            )
+        else:
+            leaf = unit[1]
+            eid = leaf.get("eId", "")
+            if not eid:
+                # Symmetry with build_sections's leaf branch (which does
+                # `if not eid: continue` before ever calling _add_entry): a
+                # leaf with no eId gets no `sections` entry there, so it must
+                # get no TOC child here either -- otherwise the TOC would
+                # list a node the bundle has no content for, breaking the
+                # "TOC and bundle never disagree" property Task 4 guarantees.
+                continue
+            assert eid not in used, (
+                f"duplicate schedule TOC eid {eid!r} -- a schedule-unit eId "
+                "collision should not reach the TOC after lex-au v0.10.0's "
+                "B4 fix; this indicates a converter regression"
+            )
+            used.add(eid)
+            children.append(
+                {"eid": eid, "heading": _entry_heading(leaf), "children": []}
+            )
+    return children
 
 
 def build_toc(root: ET._Element) -> list[dict]:
@@ -167,55 +298,8 @@ def build_toc(root: ET._Element) -> list[dict]:
         f".//{AKN}attachments/{AKN}attachment/{AKN}hcontainer[@name='schedule']"
     ):
         sched_eid = sched.get("eId", "")
-        children: list[dict] = []
-        # Task 4: mirror _add_entry's disambiguation (against a per-schedule
-        # set instead of the `sections` dict, which build_toc never sees) so
-        # the TOC lists the same keys build_sections actually wrote.
         used: set[str] = set()
-        for unit in _schedule_units(sched):
-            if unit[0] == "clause":
-                clause = unit[1]
-                eid = clause.get("eId", "")
-                if not eid:
-                    # Symmetry with build_sections's clause branch (which
-                    # does `if not eid: continue` before ever calling
-                    # _add_entry): a clause with no eId gets no `sections`
-                    # entry there, so it must get no TOC child here either --
-                    # otherwise the TOC would list a node the bundle has no
-                    # content for, breaking the "TOC and bundle never
-                    # disagree" property this task exists to guarantee.
-                    continue
-                key = _next_free_key(eid, lambda k: k in used)
-                used.add(key)
-                children.append(
-                    {
-                        "eid": key,
-                        "heading": _entry_heading(clause),
-                        "children": [],
-                    }
-                )
-            else:
-                _, raw_key, _run = unit
-                key = _next_free_key(raw_key, lambda k: k in used)
-                used.add(key)
-                # A no-clause schedule's single whole-schedule run keys under
-                # the bare schedule eId (see ``_schedule_units``). That would
-                # make a TOC child whose ``eid`` is identical to its parent
-                # schedule node's -- a redundant, self-referential nav row
-                # (361 such cases in the corpus) and an ambiguous
-                # ``getElementById`` target. The schedule node itself already
-                # navigates there (the reader's ``flattenLeafEids`` falls back
-                # to ``[node.eid]`` for a childless node), and
-                # ``build_sections`` still writes the bundle entry under this
-                # key, so suppress only the duplicate child row.
-                if key == sched_eid:
-                    continue
-                # Synthetic (loose-prose) block units have no <num>/<heading>
-                # of their own; give them one consistent short label so the
-                # reader never renders a blank clickable TOC row.
-                children.append(
-                    {"eid": key, "heading": _SCHEDULE_BLOCK_LABEL, "children": []}
-                )
+        children = _schedule_toc_children(sched_eid, _schedule_units(sched), used)
         out.append(
             {
                 "eid": sched_eid,
@@ -547,17 +631,42 @@ def _schedule_label(sched: ET._Element) -> str:
     return label
 
 
-def _next_free_key(eid: str, taken: Callable[[str], bool]) -> str:
-    """The bundle key ``eid`` should resolve to, given ``taken(key)`` -- a
-    membership predicate over keys already in use.
+def _add_entry(
+    sections: dict[str, dict],
+    eid: str,
+    heading: str,
+    html: str,
+) -> None:
+    """Record one SCHEDULE-UNIT bundle entry (a clause/item leaf or a
+    schedule-scoped block run -- never a body head-note entry, see
+    :func:`_add_headnote_entry` for that axis).
 
-    ``eid`` itself if free; otherwise ``f"{eid}{_EID_DISAMBIG}{n}"`` for the
-    smallest free ``n`` starting at 2. This is the single disambiguation rule
-    shared by :func:`_add_entry` (checked against the ``sections`` dict it is
-    about to write into) and :func:`build_toc` (checked against a per-schedule
-    ``set`` -- see its schedule loop) so the two never disagree on the key a
-    colliding schedule unit gets.
+    Asserts ``eid`` is not already in ``sections`` (Task 22): pre-B4, the
+    converter could emit two distinct schedule units sharing one eId (see
+    ``tests/fixtures/corpus/sched-dup-eid.xml``), which used to be silently
+    disambiguated here. lex-au v0.10.0's B4 fix eliminates that collision at
+    the source, so a duplicate reaching this function today can only mean a
+    converter regression -- silently suffixing it would hide that regression
+    rather than surface it. Schedule-unit eIds always carry a leading
+    ``schedule-`` segment, so this can never collide with a head-note key
+    (see ``_add_headnote_entry``), which is always a body-container eid plus
+    ``__head``.
     """
+    assert eid not in sections, (
+        f"duplicate schedule-unit eId {eid!r} reached bundle assembly -- a "
+        "schedule-unit eId collision should not occur after lex-au v0.10.0's "
+        "B4 fix; this indicates a converter regression, not a case to "
+        "disambiguate around"
+    )
+    sections[eid] = {"heading": heading, "html": html}
+
+
+def _next_free_key(eid: str, taken: Callable[[str], bool]) -> str:
+    """``eid`` itself if ``taken(eid)`` is false; otherwise
+    ``f"{eid}{_EID_DISAMBIG}{n}"`` for the smallest free ``n`` starting at 2.
+    Used only by :func:`_add_headnote_entry` (Task 22 confined this to the
+    head-note axis; see ``_EID_DISAMBIG``'s module comment for why that axis
+    still needs it)."""
     if not taken(eid):
         return eid
     n = 2
@@ -566,46 +675,30 @@ def _next_free_key(eid: str, taken: Callable[[str], bool]) -> str:
     return f"{eid}{_EID_DISAMBIG}{n}"
 
 
-def _add_entry(
+def _add_headnote_entry(
     sections: dict[str, dict],
     eid: str,
     heading: str,
     html: str,
-    counts: "collections.Counter[str]",
-) -> str:
-    """Record one bundle entry, disambiguating ``eid`` if it collides.
+) -> None:
+    """Record one body-container HEAD-NOTE bundle entry, disambiguating
+    ``eid`` if it collides (Task 7 original behaviour, kept through Task 22).
 
-    Schedule clause eIds can repeat across a schedule (the converter flattens
-    Part/Division numbering -- see ``tests/fixtures/corpus/sched-dup-eid.xml``
-    and ``../lex-au/repo/FUTURE.md``). A colliding ``eid`` would otherwise
-    silently overwrite the earlier entry, permanently losing its content.
-
-    On collision the returned key is ``f"{eid}{_EID_DISAMBIG}{n}"`` (n >= 2,
-    ``counts["disambiguated_eids"]`` incremented once per collision).
-
-    The ``html.replace(f'id="{eid}"', ...)`` line below is **provably inert for
-    every top-level unit in this corpus today**, and is kept only defensively.
-    Task 4's verified ruling (progress.md): ``render_section`` /
-    ``HtmlStyleMap._provision`` stamp an ``id=`` for *nested provision*
-    descendants only -- a top-level ``section``-kind unit (what a whole schedule
-    clause / block parses to) never emits its own eId as an ``id=`` attribute,
-    and a nested provision's eId always carries an extra ``__`` segment so it
-    can never literally equal ``eid``. There is therefore no ``id="{eid}"``
-    substring in ``html`` for the replace to hit.
-
-    The other collision axis -- duplicate ``id=`` attributes *within* one
-    rendered clause (repeated ``para-a`` / ``para-b`` siblings sharing an eId
-    inside a single clause, e.g. sched-clause.xml's ``schedule-1__clause-70-20``)
-    -- is now handled upstream by :func:`build.parse._dedupe_eids`, which
-    suffixes the repeats in the Node tree before ``render_section`` runs, so
-    ``_add_entry`` never sees a within-unit duplicate either.
+    Unlike a schedule-unit collision, a head-note key collision is a real,
+    ongoing, legitimate real-corpus shape unrelated to B4: two ``<part>``/
+    ``<chapter>``/... elements can share one number at different locations
+    in the SAME Act's body (verified against the live v0.10.0 corpus running
+    this task's predeploy build: e.g.
+    ``public-service-reform-act-1984.xml`` has two literal
+    ``<part eId="part-VII">`` elements directly under ``<body>`` -- also the
+    real-corpus shape ``build/cli.py``'s ``_write_split_bundle`` comment
+    already documents for Corp Act's two ``chapter-7``s and ITAA-97's
+    repeated ``chapter-2``/``chapter-3``). Silently overwriting the first
+    container's head-note with the second's would lose content, so this
+    keeps the pre-Task-22 suffix behaviour rather than asserting.
     """
     key = _next_free_key(eid, lambda k: k in sections)
-    if key != eid:
-        counts["disambiguated_eids"] += 1
-        html = html.replace(f'id="{eid}"', f'id="{key}"', 1)
     sections[key] = {"heading": heading, "html": html}
-    return key
 
 
 def build_sections(
@@ -635,13 +728,23 @@ def build_sections(
 
     active_style = style if style is not None else HtmlStyleMap()
 
+    # Scoped to <body> (Task 22): a B4 schedule's <quotedStructure> can embed
+    # a real <section> (an inserted/substituted provision -- see
+    # tests/fixtures/corpus/sched-b4-nested.xml). An unscoped root.iter() here
+    # would also match that section and render it a second time as an
+    # orphaned top-level entry no TOC node ever points at (dead weight in
+    # every non-split Act's JSON) -- schedule content is exclusively the
+    # schedule-unit walk's job below, exactly as build_toc already scopes its
+    # own structural walk to <body> for the same reason.
+    body = root.find(f".//{AKN}body")
     parsed: list[tuple[str, str, Node]] = []
-    for section in root.iter(f"{AKN}section"):
-        eid = section.get("eId", "")
-        if not eid:
-            continue
-        heading = _numbered_heading(section)
-        parsed.append((eid, heading, parse_section(section, ref_index)))
+    if body is not None:
+        for section in body.iter(f"{AKN}section"):
+            eid = section.get("eId", "")
+            if not eid:
+                continue
+            heading = _numbered_heading(section)
+            parsed.append((eid, heading, parse_section(section, ref_index)))
 
     if on_parsed is not None:
         on_parsed([(eid, node) for eid, _, node in parsed])
@@ -651,29 +754,17 @@ def build_sections(
         for eid, heading, node in parsed
     }
 
-    for sched in root.iterfind(
-        f".//{AKN}attachments/{AKN}attachment/{AKN}hcontainer[@name='schedule']"
-    ):
-        for unit in _schedule_units(sched):
-            if unit[0] == "clause":
-                clause = unit[1]
-                eid = clause.get("eId", "")
-                if not eid:
-                    continue
-                node = parse_section(clause, ref_index)
-                heading = _entry_heading(clause)
-                # The returned key (== eid unless _add_entry disambiguated a
-                # collision) is captured, not just discarded, per Task 4: it
-                # is the actual key this unit landed under in `sections`.
-                # build_toc computes the matching key independently (via
-                # _next_free_key over its own per-schedule `used` set, since
-                # it never sees `sections`) rather than consuming this one --
-                # see build_toc's schedule loop -- so it is not threaded
-                # further here, but every caller must not silently ignore it.
-                _key = _add_entry(
-                    sections, eid, heading, render_section(node, active_style), ref_index.tally
-                )
-            else:
+    def _flatten_schedule_units(units: list) -> None:
+        """Recursive Task-22 counterpart to ``_schedule_toc_children``: walk
+        the same unit tree and write each leaf/block's bundle entry. A
+        "group" wrapper has no bundle entry of its own -- only its nested
+        units do -- so this simply recurses into it."""
+        for unit in units:
+            kind = unit[0]
+            if kind == "group":
+                _, _group_el, nested_units = unit
+                _flatten_schedule_units(nested_units)
+            elif kind == "block":
                 _, key, run = unit
                 # Task 1 BINDING: deepcopy each loose sibling into a detached
                 # <hcontainer> -- never move live nodes (that would empty the
@@ -688,13 +779,25 @@ def build_sections(
                 # not apply. They carry one consistent short label
                 # (_SCHEDULE_BLOCK_LABEL), the SAME string build_toc's block
                 # branch writes, so the TOC child and this bundle entry agree.
-                _key = _add_entry(
-                    sections,
-                    key,
-                    _SCHEDULE_BLOCK_LABEL,
+                _add_entry(
+                    sections, key, _SCHEDULE_BLOCK_LABEL,
                     render_section(node, active_style),
-                    ref_index.tally,
                 )
+            else:
+                leaf = unit[1]
+                eid = leaf.get("eId", "")
+                if not eid:
+                    continue
+                node = parse_section(leaf, ref_index)
+                heading = _entry_heading(leaf)
+                _add_entry(
+                    sections, eid, heading, render_section(node, active_style),
+                )
+
+    for sched in root.iterfind(
+        f".//{AKN}attachments/{AKN}attachment/{AKN}hcontainer[@name='schedule']"
+    ):
+        _flatten_schedule_units(_schedule_units(sched))
 
     # Task 7: head-note pass. Block content (content/p/blockList/table) sitting
     # DIRECTLY inside a <part>/<chapter>/<division>/<subdivision>/<subDivision>,
@@ -721,12 +824,11 @@ def build_sections(
         for el in run:
             wrap.append(copy.deepcopy(el))
         node = parse_section(wrap, ref_index)
-        _add_entry(
+        _add_headnote_entry(
             sections,
             f"{eid}__head",
             _headnote_heading(container),
             render_section(node, active_style),
-            ref_index.tally,
         )
 
     return sections, ref_index.tally
