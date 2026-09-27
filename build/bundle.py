@@ -42,11 +42,18 @@ _STRUCTURAL_TAGS = {
 _HEADNOTE_CONTAINER_TAGS = _STRUCTURAL_TAGS - {"section"}
 _HEADNOTE_BLOCK_TAGS = {"content", "p", "blockList", "table"}
 
-# Disambiguator, now used for exactly TWO collision axes, both unrelated to
-# B4 / schedule-unit content (Task 22 removed the THIRD, schedule-unit axis
-# that used to share this suffix -- see ``_SCHEDULE_LEAF_NAMES``'s comment
-# below, and ``_add_headnote_entry``'s docstring for why one axis survives in
-# THIS module):
+# Disambiguator, used for two collision axes this module actively guards
+# against (both unrelated to B4 / schedule-unit content -- Task 22 removed
+# the THIRD, schedule-unit axis that used to share this suffix, see
+# ``_SCHEDULE_LEAF_NAMES``'s comment below, and ``_add_headnote_entry``'s
+# docstring for why one axis survives in THIS module). NOT an exhaustive
+# census of every eId-collision path in the codebase: the body ``<section>``
+# walk a few lines below (`for section in body.iter(...)`) builds `sections`
+# via a plain dict comprehension with no disambiguation or assertion at all,
+# so a duplicate body-level `<section>` eId (confirmed on the real corpus,
+# unrelated to B4 or to this task -- see FUTURE.md) silently last-write-wins
+# there today. Flagged, not fixed, by final code review of Task 22; filed as
+# its own follow-up rather than folded into this collision-axis census.
 #
 # 1. A WITHIN-UNIT duplicate id (repeated ``para-a``/``para-b`` siblings
 #    sharing an eid one level below a single clause/item) -- handled by
@@ -817,11 +824,21 @@ def build_sections(
     # outside any <section>, is the container's head-note (5,761 such blocks in
     # the corpus). Render it as one detached <hcontainer> keyed
     # ``<container eId>__head``. <section> is deliberately not in this tag set
-    # -- a section's own content is already rendered by the pass above. The
-    # corpus has zero part/chapter/division elements inside <attachments>
-    # (verified), so this whole-tree walk can never double-render a schedule's
-    # loose content, which _schedule_units already grouped above.
-    for container in root.iter():
+    # -- a section's own content is already rendered by the pass above.
+    #
+    # Scoped to <body> (Task 22 follow-up, found by final code review): a B4
+    # schedule's <quotedStructure> can embed its own literal <part>/
+    # <chapter>/<division>/<subDivision> tags (the amending Act's own quoted
+    # citation structure) -- the "corpus has zero part/chapter/division
+    # elements inside <attachments>" claim this comment used to make was
+    # true pre-B4 and is false under v0.10.0. An unscoped walk here would
+    # emit a "__head" entry for such a container with no TOC node pointing
+    # at it (the schedule walk above never emits one for quoted-structure
+    # content) and duplicate content already rendered inside the owning
+    # item's single HTML blob -- the same double-render class Task 22
+    # already fixed for the main per-section walk above, just missed here.
+    body = root.find(f".//{AKN}body")
+    for container in (body.iter() if body is not None else ()):
         if _local_tag(container) not in _HEADNOTE_CONTAINER_TAGS:
             continue
         eid = container.get("eId", "")

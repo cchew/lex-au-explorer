@@ -42,10 +42,24 @@ _SCHEDULE_SPLIT_BYTES = 512 * 1024  # per-Act schedule html budget
 # ``_collect_section_eids`` keeps a TOC eId whose last ``__``-separated segment
 # starts with any of these (body sections plus the schedule clause / subclause
 # / between-clause block units from Task 3; "item-" added Task 22 for B4
-# amendment-instruction items -- without it a split-by-part Act's schedule
-# items would be silently dropped from every per-Part bundle file).
+# amendment-instruction items).
+#
+# "chapter-"/"part-"/"dvs-"/"subdvs-"/"amdact-" added post-ship (Task 22
+# follow-up, found by final code review): a B4 schedule grouping wrapper
+# (``build.bundle._SCHEDULE_GROUP_NAMES`` -- the corresponding eId segments
+# are minted by ``lexau.frbr.make_eid``/``_EID_PREFIX``) with loose lead-in
+# content and no leaf/group child of its own keys its one "block" run under
+# its OWN bare eId (see ``_schedule_units``'s "no leaf or group anywhere"
+# rule), e.g. ``schedule-2__chapter-1``. Without these prefixes that key's
+# last segment (``chapter-1``) matched nothing here, so the entry -- and
+# every real bundle key under it -- was silently dropped from every
+# split-by-part / oversized-schedule Act's per-file output. Confirmed live
+# on `customs-tariff-act-1995`/schedule-2: 96 chapter entries (1.56 MB) gone
+# from the deployed split file, replaced by dead (childless-in-file, but
+# still-listed-in-TOC) rows.
 _KEEP_LAST_SEGMENT_PREFIXES: tuple[str, ...] = (
     "sec-", "clause-", "subclause-", "block-", "item-",
+    "chapter-", "part-", "dvs-", "subdvs-", "amdact-",
 )
 
 app = typer.Typer()
@@ -72,7 +86,18 @@ class _TermResolverAdapter:
 
 def _nav_eids(root: ET._Element) -> list[str]:
     """Every navigable ``eId`` in the Act: the structural levels plus the
-    schedule ``clause`` / ``subclause`` hcontainers that carry an ``eId``."""
+    schedule ``clause`` / ``subclause`` / ``item`` hcontainers that carry an
+    ``eId``.
+
+    Excludes anything nested inside a ``<quotedStructure>`` (Task 22
+    follow-up, found by final code review): a B4 schedule item's quoted
+    structure can embed its own literal structural tags (the amending Act's
+    own quoted citation, e.g. ``<part>``/``<section>``) with real eIds, but
+    ``build_sections`` never renders them as separate bundle entries -- their
+    content is part of the OWNING item's single rendered HTML. Feeding one of
+    those eIds into the cross-reference index would let a ``<ref>`` resolve
+    to an eId with no DOM anchor and no TOC entry: a silent wrong link.
+    """
     eids: list[str] = []
     for el in root.iter():
         eid = el.get("eId")
@@ -82,6 +107,8 @@ def _nav_eids(root: ET._Element) -> list[str]:
         if tag in _NAV_TAGS or (
             tag == "hcontainer" and el.get("name") in _NAV_HCONTAINER_NAMES
         ):
+            if any(_local_tag(a) == "quotedStructure" for a in el.iterancestors()):
+                continue
             eids.append(eid)
     return eids
 

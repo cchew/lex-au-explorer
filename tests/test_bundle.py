@@ -640,6 +640,48 @@ def _find_toc(nodes: list[dict], eid: str) -> Optional[dict]:
     return None
 
 
+def test_headnote_pass_ignores_quoted_structure_containers() -> None:
+    """Post-ship regression (Task 22 follow-up, found by final code review):
+    the head-note pass's ``for container in root.iter()`` was whole-tree, so
+    a literal ``<part>``/``<chapter>``/``<division>``/``<subDivision>``
+    element nested inside a B4 schedule's ``<quotedStructure>`` (a real
+    corpus shape -- the amending Act's own quoted citation structure, e.g.
+    "Part 8 -- Records" being inserted) also triggered a ``__head`` bundle
+    entry. That entry has no TOC node (the schedule walk never emits one for
+    quoted-structure content) and duplicates content already rendered inside
+    the owning item's single HTML blob -- dead weight, not a reader-visible
+    bug, but bloats every affected Act's JSON. Scoped the walk to
+    ``<body>`` only, mirroring how ``build_sections``'s main per-section
+    walk was already ``<body>``-scoped in this same task."""
+    root = ET.fromstring(
+        f'<akomaNtoso xmlns="{AKN[1:-1]}"><act><attachments><attachment>'
+        f'<hcontainer name="schedule" eId="schedule-1">'
+        f"<num>1</num><heading>Amendments</heading>"
+        f'<hcontainer name="amendedAct" eId="schedule-1__amdact-1">'
+        f"<heading>Some Amended Act 2000</heading>"
+        f'<hcontainer name="item" eId="schedule-1__amdact-1__item-1">'
+        f"<num>1</num><heading>At the end of the Act</heading>"
+        f"<content><p>Add:</p></content>"
+        f'<quotedStructure eId="schedule-1__amdact-1__item-1__qstr-1">'
+        f'<part eId="schedule-1__amdact-1__item-1__qstr-1__part-8">'
+        f"<num>8</num><heading>Records</heading>"
+        f"<content><p>Quoted part introductory text.</p></content>"
+        f'<section eId="schedule-1__amdact-1__item-1__qstr-1__part-8__sec-1">'
+        f"<num>1</num><heading>Kept</heading>"
+        f"<content><p>real content</p></content></section>"
+        f"</part></quotedStructure>"
+        f"</hcontainer></hcontainer></hcontainer>"
+        f"</attachment></attachments></act></akomaNtoso>"
+    )
+    sections, _ = build_sections(root, build_ref_index(_all_nav_eids(root)))
+    assert "schedule-1__amdact-1__item-1__qstr-1__part-8__head" not in sections
+    # The item's own single entry still carries the quoted part's content.
+    assert (
+        "Quoted part introductory text"
+        in sections["schedule-1__amdact-1__item-1"]["html"]
+    )
+
+
 def test_chapter_level_content_renders_as_head_entry() -> None:
     """part-headnote.xml (cut from evidence-act-1995.xml) has a real
     <chapter>-level "INTRODUCTORY NOTE" <content> block directly under

@@ -503,6 +503,33 @@ def test_nav_eids_collects_structural_levels_and_schedule_clauses():
     assert "schedule-1" not in eids
 
 
+def test_nav_eids_excludes_quoted_structure_content():
+    """Post-ship regression (Task 22 follow-up, found by final code review):
+    a B4 schedule item's ``<quotedStructure>`` can embed its own literal
+    ``<part>``/``<section>``/... tags (the amending Act's own quoted citation
+    structure) carrying real eIds -- but ``build_sections`` never renders
+    them as separate bundle entries (their content is part of the OWNING
+    item's single rendered HTML). Including them in the nav-eid index that
+    feeds cross-reference resolution let a ``<ref>`` resolve to an eId with
+    no DOM anchor and no TOC entry -- a silent wrong link. Confirmed against
+    the live v0.10.0 corpus: 566 body refs currently target such an eId."""
+    root = ET.fromstring(
+        f'<akomaNtoso xmlns="{_AKN_NS}"><act><attachments><attachment>'
+        f'<hcontainer name="schedule" eId="schedule-1">'
+        f'<hcontainer name="item" eId="schedule-1__item-1">'
+        f'<quotedStructure eId="schedule-1__item-1__qstr-1">'
+        f'<part eId="schedule-1__item-1__qstr-1__part-8">'
+        f'<section eId="schedule-1__item-1__qstr-1__part-8__sec-1"/>'
+        f"</part></quotedStructure>"
+        f"</hcontainer></hcontainer>"
+        f"</attachment></attachments></act></akomaNtoso>"
+    )
+    eids = set(_nav_eids(root))
+    assert "schedule-1__item-1" in eids  # the item itself is still navigable
+    assert "schedule-1__item-1__qstr-1__part-8" not in eids
+    assert "schedule-1__item-1__qstr-1__part-8__sec-1" not in eids
+
+
 def test_term_resolver_adapter_binds_frbr_uri_and_returns_result():
     calls = []
 
@@ -564,9 +591,15 @@ def test_split_bundle_covers_every_source_section_exactly_once(tmp_path):
 
     toc = build_toc(root)
     # toc must now descend through <subDivision> to reach the nested section.
+    # "chapter-1" and "chapter-1__dvs-1" are harmlessly swept in too
+    # (post-ship "chapter-"/"dvs-" prefix addition to
+    # _KEEP_LAST_SEGMENT_PREFIXES -- neither is ever a real `sections` key
+    # for a bare body chapter/division, so the write sites' `if k in
+    # sections` filter drops both; the "exactly once" invariant this test
+    # guards is checked below against the real written files, not this set).
     assert _collect_section_eids(
         next(n for n in toc if n["eid"] == "chapter-1")
-    ) == {"chapter-1__dvs-1__sdvs-A__sec-3"}
+    ) == {"chapter-1", "chapter-1__dvs-1", "chapter-1__dvs-1__sdvs-A__sec-3"}
 
     sections, _ = build_sections(root, _bri([]))
     bundle_meta = {"title": "Synthetic Split Act", "split_by_part": True,
@@ -642,6 +675,13 @@ def test_collect_section_eids_keeps_container_head_notes():
         ],
     }
     assert _collect_section_eids(node) == {
+        # "part-2" itself is harmlessly swept in too (post-ship "part-"
+        # prefix addition, see _KEEP_LAST_SEGMENT_PREFIXES's comment): it is
+        # never a real `sections` key for a bare body Part, so both write
+        # sites' `if k in sections` filter drops it silently. Kept in this
+        # assertion (not filtered out here) so this test states the actual
+        # function output, not a hand-picked subset of it.
+        "part-2",
         "part-2__head",
         "part-2__div-1__head",
         "part-2__div-1__sec-5",
@@ -780,4 +820,60 @@ def test_collect_section_eids_recurses_into_divisions():
         ],
     }
     eids = _collect_section_eids(toc_node)
-    assert eids == {"part-I__div-1__sec-1", "part-I__sec-2"}
+    # "part-I" itself is harmlessly swept in too (post-ship "part-" prefix
+    # addition -- see test_collect_section_eids_keeps_container_head_notes).
+    assert eids == {"part-I", "part-I__div-1__sec-1", "part-I__sec-2"}
+
+
+def test_write_schedule_parts_keeps_bare_group_block_content(tmp_path):
+    """End-to-end regression for the same defect, through the real pipeline
+    (build_toc + build_sections + _write_schedule_parts), not just the
+    isolated dict fixture above: a B4 schedule group wrapper with loose
+    content and no leaf/group child (a real corpus shape -- e.g. a Customs
+    Tariff chapter whose only content is an introductory note before its
+    first item) must have its content survive into the written per-schedule
+    file, not just its dead TOC row."""
+    from build.bundle import build_sections, build_toc
+    from build.cli import _write_schedule_parts
+    from build.refindex import build_ref_index
+
+    root = ET.fromstring(
+        f'<akomaNtoso xmlns="{_AKN_NS}"><act><attachments><attachment>'
+        f'<hcontainer name="schedule" eId="schedule-1">'
+        f"<num>1</num><heading>Classification</heading>"
+        f'<hcontainer name="chapter" eId="schedule-1__chapter-1">'
+        f"<num>1</num><heading>Live animals</heading>"
+        f"<content><p>Chapter note text, no items in this chapter yet.</p></content>"
+        f"</hcontainer>"
+        f"</hcontainer></attachment></attachments></act></akomaNtoso>"
+    )
+    toc = build_toc(root)
+    sections, _ = build_sections(root, build_ref_index([]))
+
+    sched_node = next(n for n in toc if n["eid"] == "schedule-1")
+    out_dir = tmp_path / "data"
+    out_dir.mkdir()
+    _write_schedule_parts(out_dir, sched_node, sections)
+
+    written = json.loads((out_dir / "schedule-1.json").read_text())
+    assert "schedule-1__chapter-1" in written["sections"]
+    assert "Chapter note text" in written["sections"]["schedule-1__chapter-1"]["html"]
+
+
+def test_collect_section_eids_keeps_bare_group_block_key():
+    """Post-ship regression (Task 22 follow-up): a B4 schedule grouping
+    wrapper (``<hcontainer name="chapter"|"part"|"division"|"subDivision"|
+    "amendedAct">``) with loose lead-in content and NO leaf/group child of
+    its own keys its one run under its OWN bare eId, e.g.
+    ``schedule-2__chapter-1`` (see ``build.bundle._schedule_units``'s
+    "block" key rule). That eId's last ``__``-segment is ``chapter-1``,
+    which matched no ``_KEEP_LAST_SEGMENT_PREFIXES`` entry until this fix --
+    silently dropping the entry from every split-by-part / oversized-schedule
+    Act's per-file output (confirmed live on
+    `customs-tariff-act-1995`/schedule-2: 96 chapter entries, 1.56 MB, gone
+    from the deployed split file, dead TOC rows in their place)."""
+    node = {
+        "eid": "schedule-2__chapter-1",
+        "children": [],
+    }
+    assert _collect_section_eids(node) == {"schedule-2__chapter-1"}
