@@ -418,6 +418,66 @@ def test_schedule_label_from_ordinal() -> None:
     )
 
 
+def test_schedule_label_prefers_gazetted_num_over_document_ordinal() -> None:
+    """Task 23: real-corpus regression found by Task 21's triage --
+    `electoral-legislation-amendment-(electoral-reform)-act-2025` has a
+    gazetted numbering gap (schedule at document position 7 carries
+    `<num>6</num>`). A schedule's `<num>` child (Task 3's gazetted number,
+    verbatim from the source `_SCHEDULE_RE` match) must be preferred over the
+    document-position ordinal when present -- the label must read "Schedule
+    5", not "Schedule 3", for a schedule at position 3 whose `<num>` says 5."""
+    root = ET.fromstring(
+        f'<akomaNtoso xmlns="{AKN[1:-1]}"><act><attachments><attachment>'
+        f'<hcontainer name="schedule" eId="schedule-1">'
+        f"<num>1</num><heading>First</heading>"
+        f"<content><p>body</p></content></hcontainer>"
+        f"</attachment><attachment>"
+        f'<hcontainer name="schedule" eId="schedule-2">'
+        f"<num>2</num><heading>Second</heading>"
+        f"<content><p>body</p></content></hcontainer>"
+        f"</attachment><attachment>"
+        # Third schedule by document position, but gazetted <num> is 5
+        # (a numbering gap -- the real-corpus shape this guards).
+        f'<hcontainer name="schedule" eId="schedule-3">'
+        f"<num>5</num><heading>Third but gazetted fifth</heading>"
+        f"<content><p>body</p></content></hcontainer>"
+        f"</attachment></attachments></act></akomaNtoso>"
+    )
+    toc = build_toc(root)
+    labels = {n["eid"]: n["heading"] for n in toc if n["eid"].startswith("schedule-")}
+    assert labels["schedule-1"] == "Schedule 1 — First"
+    assert labels["schedule-2"] == "Schedule 2 — Second"
+    assert labels["schedule-3"] == "Schedule 5 — Third but gazetted fifth"
+
+
+def test_schedule_label_from_num_handles_roman_numerals() -> None:
+    """Roman-numeral gazetted numbers (Task 3's other `_SCHEDULE_RE` case)
+    must be used verbatim too, not coerced to an ordinal."""
+    root = ET.fromstring(
+        f'<akomaNtoso xmlns="{AKN[1:-1]}"><act><attachments><attachment>'
+        f'<hcontainer name="schedule" eId="schedule-1">'
+        f"<num>IV</num><heading>Fourth in Roman</heading>"
+        f"<content><p>body</p></content></hcontainer>"
+        f"</attachment></attachments></act></akomaNtoso>"
+    )
+    toc = build_toc(root)
+    assert toc[0]["heading"] == "Schedule IV — Fourth in Roman"
+
+
+def test_schedule_label_falls_back_to_ordinal_when_no_num() -> None:
+    """No `<num>` child -> unchanged fallback behaviour (the ordinal path),
+    proving Task 23 only adds a preference, not a required field."""
+    root = ET.fromstring(
+        f'<akomaNtoso xmlns="{AKN[1:-1]}"><act><attachments><attachment>'
+        f'<hcontainer name="schedule" eId="schedule-1">'
+        f"<heading>No num at all</heading>"
+        f"<content><p>body</p></content></hcontainer>"
+        f"</attachment></attachments></act></akomaNtoso>"
+    )
+    toc = build_toc(root)
+    assert toc[0]["heading"] == "Schedule 1 — No num at all"
+
+
 def test_schedule_label_verbatim_when_heading_already_says_schedule() -> None:
     """A schedule whose <heading> already reads "Schedule N" (gazette form)
     must be used verbatim -- not re-numbered or have an ordinal appended."""

@@ -580,8 +580,11 @@ def _schedule_label(sched: ET._Element) -> str:
     If the schedule's own ``<heading>`` already reads in gazette form (starts
     with the whole word "Schedule" -- see :func:`_starts_with_token` -- e.g.
     "Schedule 2", "Schedule\\xa02", "Schedule I—") it is returned verbatim.
-    Otherwise a synthesised ``"Schedule {ordinal}"`` label is used, with
-    `` — {heading}`` appended when a heading exists.
+    Otherwise a synthesised ``"Schedule {number}"`` label is used, with
+    `` — {heading}`` appended when a heading exists. ``{number}`` prefers the
+    schedule's own ``<num>`` (Task 3's gazetted number) when present, falling
+    back to the document-position ordinal only when there is no ``<num>``
+    (Task 23).
 
     Token-boundary matching (not plain ``str.startswith``) is required:
     a real-corpus review finding (post Task 5 approval) showed plain
@@ -618,14 +621,24 @@ def _schedule_label(sched: ET._Element) -> str:
     heading_text = (heading_el.text or "").strip() if heading_el is not None else ""
     if _starts_with_token(heading_text, "Schedule"):
         return heading_text
-    root = sched.getroottree().getroot()
-    schedules = list(
-        root.iterfind(
-            f".//{AKN}attachments/{AKN}attachment/{AKN}hcontainer[@name='schedule']"
+    # Task 23: the schedule's own <num> (Task 3 -- the gazetted number,
+    # verbatim from the source "Schedule N" heading) takes precedence over
+    # the document-position ordinal below when present. A small number of
+    # Acts have a gazetted numbering gap (e.g. "Schedule 1, 2, 5" -- the
+    # third schedule by document position is still gazetted "5"), so the
+    # ordinal and the gazetted number can legitimately differ.
+    num_text = (sched.findtext(f"{AKN}num") or "").strip()
+    if num_text:
+        number = num_text
+    else:
+        root = sched.getroottree().getroot()
+        schedules = list(
+            root.iterfind(
+                f".//{AKN}attachments/{AKN}attachment/{AKN}hcontainer[@name='schedule']"
+            )
         )
-    )
-    ordinal = schedules.index(sched) + 1
-    label = f"Schedule {ordinal}"
+        number = str(schedules.index(sched) + 1)
+    label = f"Schedule {number}"
     if heading_text:
         label += f" — {heading_text}"
     return label
