@@ -297,9 +297,14 @@ def _schedule_toc_children(
 
 def build_toc(root: ET._Element) -> list[dict]:
     body = root.find(f".//{AKN}body")
+    keys = {} if body is None else _body_section_keys(body)
     out: list[dict] = (
         [] if body is None
-        else [_toc_node(child) for child in body if _local_tag(child) in _STRUCTURAL_TAGS]
+        else [
+            _toc_node(child, keys)
+            for child in body
+            if _local_tag(child) in _STRUCTURAL_TAGS
+        ]
     )
     for sched in root.iterfind(
         f".//{AKN}attachments/{AKN}attachment/{AKN}hcontainer[@name='schedule']"
@@ -448,13 +453,14 @@ def build_preface(root: ET._Element) -> Optional[dict]:
     }
 
 
-def _toc_node(el: ET._Element) -> dict:
+def _toc_node(el: ET._Element, keys: dict[ET._Element, str] | None = None) -> dict:
+    keys = keys if keys is not None else {}
     heading_el = el.find(f"{AKN}heading")
     num_el = el.find(f"{AKN}num")
     heading_text = (heading_el.text or "").strip() if heading_el is not None else ""
     num_text = (num_el.text or "").strip() if num_el is not None else ""
     heading = f"{num_text} {heading_text}".strip()
-    children = [_toc_node(c) for c in el if _local_tag(c) in _STRUCTURAL_TAGS]
+    children = [_toc_node(c, keys) for c in el if _local_tag(c) in _STRUCTURAL_TAGS]
     # Task 7: a part/chapter/division/subdivision/subDivision (never a
     # <section> -- it renders its own content) with direct head-note block
     # content gets a synthetic ``__head`` child prepended AHEAD of its nested
@@ -480,7 +486,11 @@ def _toc_node(el: ET._Element) -> dict:
                 "children": [],
             },
         )
-    return {"eid": el.get("eId", ""), "heading": heading, "children": children}
+    return {
+        "eid": keys.get(el, el.get("eId", "")),
+        "heading": heading,
+        "children": children,
+    }
 
 
 def _starts_with_token(text: str, prefix: str) -> bool:
@@ -695,6 +705,29 @@ def _next_free_key(eid: str, taken: Callable[[str], bool]) -> str:
     return f"{eid}{_EID_DISAMBIG}{n}"
 
 
+def _body_section_keys(body: ET._Element) -> dict[ET._Element, str]:
+    """Bundle key for every eId-bearing body ``<section>``, in document order.
+
+    The first section with an eId keeps it; a later section sharing that eId
+    gets ``<eid>~2``, ``<eid>~3``, ... instead of silently overwriting the
+    earlier one (79 Acts, ~104 sections in the v0.10.0 corpus: a reproduced
+    Act's ``sec-1`` repeating the amending Act's ``sec-1``, or a ``NOTE``
+    section reusing its neighbour's number -- every duplicate is distinct
+    source text). Shared by :func:`build_sections` and :func:`build_toc` so
+    the TOC and the bundle can never disagree on a key. The dict holds the
+    elements, which keeps their lxml proxies alive so identity lookups hold."""
+    used: set[str] = set()
+    keys: dict[ET._Element, str] = {}
+    for section in body.iter(f"{AKN}section"):
+        eid = section.get("eId", "")
+        if not eid:
+            continue
+        key = _next_free_key(eid, used.__contains__)
+        used.add(key)
+        keys[section] = key
+    return keys
+
+
 def _add_headnote_entry(
     sections: dict[str, dict],
     eid: str,
@@ -759,12 +792,12 @@ def build_sections(
     body = root.find(f".//{AKN}body")
     parsed: list[tuple[str, str, Node]] = []
     if body is not None:
-        for section in body.iter(f"{AKN}section"):
-            eid = section.get("eId", "")
-            if not eid:
-                continue
+        for section, key in _body_section_keys(body).items():
             heading = _numbered_heading(section)
-            parsed.append((eid, heading, parse_section(section, ref_index)))
+            node = parse_section(section, ref_index)
+            # A disambiguated key (``<eid>~N``) is also the rendered anchor id.
+            node.attrs["eid"] = key
+            parsed.append((key, heading, node))
 
     if on_parsed is not None:
         on_parsed([(eid, node) for eid, _, node in parsed])

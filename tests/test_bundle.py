@@ -810,3 +810,53 @@ def test_duplicate_headnote_key_is_disambiguated_not_asserted() -> None:
     assert "part-VII__head~2" in sections
     assert "First VII head-note" in sections["part-VII__head"]["html"]
     assert "Second VII head-note" in sections["part-VII__head~2"]["html"]
+
+
+def _dup_section_root(n: int = 2) -> ET._Element:
+    """An Act whose body has ``n`` distinct ``<section>``s sharing eId
+    ``sec-1`` (real-corpus shape: 79 Acts, e.g. a reproduced Act's own
+    ``sec-1`` after the amending Act's ``sec-1``)."""
+    body = "".join(
+        f'<section eId="sec-1"><num>1</num><heading>Heading {i}</heading>'
+        f"<content><p>Body text {i}.</p></content></section>"
+        for i in range(1, n + 1)
+    )
+    return ET.fromstring(
+        f'<akomaNtoso xmlns="{AKN[1:-1]}"><act><body>{body}</body></act></akomaNtoso>'
+    )
+
+
+def test_duplicate_body_section_eid_keeps_every_section() -> None:
+    """A duplicate body ``<section>`` eId must not silently last-write-wins:
+    the second and later sections are kept under ``<eid>~N`` keys."""
+    root = _dup_section_root(3)
+    sections, _ = build_sections(root, build_ref_index(_all_nav_eids(root)))
+
+    assert set(sections) == {"sec-1", "sec-1~2", "sec-1~3"}
+    assert "Body text 1." in sections["sec-1"]["html"]
+    assert "Body text 2." in sections["sec-1~2"]["html"]
+    assert "Body text 3." in sections["sec-1~3"]["html"]
+    assert sections["sec-1~2"]["heading"] == "1 Heading 2"
+
+
+def test_toc_lists_duplicate_body_sections_at_bundle_keys() -> None:
+    """TOC and bundle must agree (Task 4 property): each duplicate section
+    gets its own TOC row pointing at its own bundle key."""
+    root = _dup_section_root(2)
+    toc = build_toc(root)
+    sections, _ = build_sections(root, build_ref_index(_all_nav_eids(root)))
+
+    assert [n["eid"] for n in toc] == ["sec-1", "sec-1~2"]
+    assert {n["eid"] for n in toc} == set(sections)
+
+
+def test_unique_body_section_eids_are_unchanged() -> None:
+    root = ET.fromstring(
+        f'<akomaNtoso xmlns="{AKN[1:-1]}"><act><body>'
+        f'<section eId="sec-1"><num>1</num><content><p>a</p></content></section>'
+        f'<section eId="sec-2"><num>2</num><content><p>b</p></content></section>'
+        f"</body></act></akomaNtoso>"
+    )
+    sections, _ = build_sections(root, build_ref_index(_all_nav_eids(root)))
+    assert list(sections) == ["sec-1", "sec-2"]
+    assert [n["eid"] for n in build_toc(root)] == ["sec-1", "sec-2"]
