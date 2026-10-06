@@ -15,4 +15,9 @@ describe("ActHeader", () => {
     expect(wrapper.text()).toContain("Privacy Act 1988");
     expect(wrapper.text()).toContain("No. 119 of 1988");
   });
+
+  it("shows the FRBR Work URI", () => {
+    const wrapper = mount(ActHeader, { props: { bundle: BUNDLE } });
+    expect(wrapper.text()).toContain("FRBR /akn/au/act/1988/119");
+  });
 });

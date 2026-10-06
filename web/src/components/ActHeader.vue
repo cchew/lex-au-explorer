@@ -8,6 +8,7 @@ defineProps<{ bundle: ActBundle }>();
     <h2>{{ bundle.title }}</h2>
     <div class="act-meta">
       <span class="act-badge">No. {{ bundle.number }} of {{ bundle.year }}</span>
+      <span class="act-badge" title="FRBR Work URI: the Act's Akoma Ntoso identifier">FRBR {{ bundle.frbr_uri }}</span>
     </div>
   </div>
 </template>
