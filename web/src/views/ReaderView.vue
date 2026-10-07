@@ -29,6 +29,12 @@ const matcher = shallowRef<Matcher | null>(null);
 const termIndex = shallowRef<Map<string, TermEntry>>(new Map());
 const highlightEnabled = ref(readHighlightToggle());
 
+// Below this width the TOC stacks above the content as a collapsible block.
+const narrowQuery: MediaQueryList | null =
+  typeof window !== "undefined" && window.matchMedia ? window.matchMedia("(max-width: 720px)") : null;
+const tocOpen = ref(!narrowQuery?.matches);
+narrowQuery?.addEventListener("change", (e) => { tocOpen.value = !e.matches; });
+
 function readHighlightToggle(): boolean {
   try {
     return localStorage.getItem("lexau:highlight") !== "off";
@@ -256,6 +262,7 @@ async function scrollToSection(eid: string) {
 
 async function selectSection(eid: string) {
   activeSection.value = eid;
+  if (narrowQuery?.matches) tocOpen.value = false;
   track("toc_navigate", { slug: currentSlug.value, position: sectionPosition(eid) });
   const b = bundle.value;
   if (!b) return;
@@ -324,7 +331,10 @@ onMounted(() => {
     <p v-if="error" class="load-error">{{ error }}</p>
     <div v-if="bundle" class="reader-layout">
       <aside class="toc-sidebar">
-        <ActToc :nodes="bundle.toc" :active-eid="activeSection" @select="selectSection" />
+        <details class="toc-details" :open="tocOpen" @toggle="tocOpen = ($event.target as HTMLDetailsElement).open">
+          <summary class="toc-summary">Contents</summary>
+          <ActToc :nodes="bundle.toc" :active-eid="activeSection" @select="selectSection" />
+        </details>
       </aside>
       <div class="content-pane" @click="onContentClick">
         <ActHeader :bundle="bundle" />
@@ -364,6 +374,31 @@ onMounted(() => {
 }
 
 .content-pane { min-width: 0; }
+
+.toc-summary { display: none; }
+
+@media (max-width: 720px) {
+  .reader-layout { grid-template-columns: minmax(0, 1fr); gap: var(--s-3); }
+  .toc-sidebar {
+    position: static;
+    max-height: none;
+    overflow: visible;
+    border-right: none;
+    border-bottom: 1px solid var(--color-border);
+    padding: 0 0 var(--s-3);
+  }
+  .toc-summary {
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.875rem;
+    padding: var(--s-2) 0;
+  }
+  .toc-summary { display: flex; justify-content: space-between; align-items: center; list-style: none; }
+  .toc-summary::-webkit-details-marker { display: none; }
+  .toc-summary::after { content: "\25BE"; color: var(--color-ink-2); }
+  .toc-details[open] > .toc-summary::after { transform: rotate(180deg); }
+  .toc-details[open] > :not(summary) { max-height: 50vh; overflow-y: auto; }
+}
 
 .highlight-toggle {
   display: inline-flex;
