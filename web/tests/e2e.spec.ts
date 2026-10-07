@@ -56,3 +56,33 @@ test("split-by-Part Act loads its first Part's sections", async ({ page }) => {
   await page.getByTestId("search-option").filter({ hasText: "Big Split Act 2026" }).click();
   await expect(page.getByText("Part I content.")).toBeVisible();
 });
+
+test.describe("narrow screens", () => {
+  test.use({ viewport: { width: 390, height: 800 } });
+
+  test("TOC collapses into a Contents block above the Act text", async ({ page }) => {
+    await page.goto("/reader/privacy-act-1988");
+    const summary = page.getByText("Contents", { exact: true });
+    const tocButton = page.getByRole("button", { name: "Dealing with credit information" });
+    await expect(summary).toBeVisible();
+    await expect(tocButton).toBeHidden();
+
+    // Act text uses the full width, not an ~80px sliver beside a sidebar
+    const pane = await page.locator(".content-pane").boundingBox();
+    expect(pane?.width).toBeGreaterThan(300);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+    await summary.click();
+    await expect(tocButton).toBeVisible();
+
+    // picking an entry closes the block so the section is on screen
+    await tocButton.click();
+    await expect(tocButton).toBeHidden();
+  });
+});
+
+test("desktop keeps the TOC open with no Contents toggle", async ({ page }) => {
+  await page.goto("/reader/privacy-act-1988");
+  await expect(page.getByText("Contents", { exact: true })).toBeHidden();
+  await expect(page.getByRole("button", { name: "Dealing with credit information" })).toBeVisible();
+});
