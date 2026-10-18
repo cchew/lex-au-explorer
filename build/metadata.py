@@ -1,11 +1,14 @@
 from __future__ import annotations
 import json
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 import lxml.etree as ET
 
 AKN_NS = "http://docs.oasis-open.org/legaldocml/ns/akn/3.0"
 AKN = f"{{{AKN_NS}}}"
+
+logger = logging.getLogger(__name__)
 
 _SPLIT_BY_PART_THRESHOLD_BYTES = 5 * 1024 * 1024  # 5MB raw XML
 
@@ -39,8 +42,36 @@ class ActMeta:
         return f"https://www.legislation.gov.au/{self.title_id}/latest/text"
 
 
+# lex-au index.json "structure_version" values the explorer has been tested against
+# (lex-au corpus.py STRUCTURE_VERSION): 1 flat schedules, 2 nested schedules and
+# quotedStructure amendments. An unknown value means lex-au changed shape again;
+# refuse rather than render a silently incomplete site.
+SUPPORTED_STRUCTURE_VERSIONS = frozenset({1, 2})
+
+
+class UnsupportedCorpusStructure(RuntimeError):
+    pass
+
+
+def check_structure_version(index: dict) -> None:
+    version = index.get("structure_version")
+    if version is None:
+        logger.warning(
+            "corpus index.json has no structure_version (pre-2026-10-15 lex-au export); "
+            "assuming a supported shape"
+        )
+        return
+    if version not in SUPPORTED_STRUCTURE_VERSIONS:
+        raise UnsupportedCorpusStructure(
+            f"corpus structure_version {version!r} is not supported by lex-au-explorer "
+            f"(supported: {sorted(SUPPORTED_STRUCTURE_VERSIONS)}). lex-au changed the AKN "
+            "shape; update and re-test the parsers (tests/parity) before building."
+        )
+
+
 def load_corpus_index(index_path: Path, xml_dir: Path) -> dict[str, ActMeta]:
     data = json.loads(index_path.read_text())
+    check_structure_version(data)
     result: dict[str, ActMeta] = {}
     for slug, entry in data["acts"].items():
         xml_path = xml_dir.parent / entry["xml_path"]
