@@ -22,6 +22,7 @@ lex-au-explorer-verify = "build.verify_cli:app"
 [project.optional-dependencies]
 dev = [
     "pytest>=8.2",
+    "lexau-contract-fixtures @ git+https://github.com/cchew/lex-au@contract-fixtures-v2.0.0#subdirectory=contract-fixtures",
 ]
 
 [tool.setuptools.packages.find]
