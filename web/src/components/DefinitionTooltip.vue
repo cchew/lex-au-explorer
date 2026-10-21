@@ -82,7 +82,7 @@ const differs = computed(
   margin-top: var(--s-3); padding-top: var(--s-2); border-top: 1px solid var(--color-border);
 }
 .definition-actwide-label { font-size: 0.6875rem; color: var(--color-ink-2); margin-bottom: var(--s-1); }
-.definition-actwide-ref { margin-left: var(--s-2); font-size: 0.6875rem; color: var(--color-ink-3); }
+.definition-actwide-ref { margin-left: var(--s-2); font-size: 0.6875rem; color: var(--color-ink-2); }
 .definition-actalike {
   display: inline-block; margin-top: var(--s-2); font-size: 0.6875rem;
   color: var(--color-link); text-decoration: underline;

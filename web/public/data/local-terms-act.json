@@ -1,0 +1,90 @@
+{
+  "frbr_uri": "/akn/au/act/2026/2",
+  "title": "Local Terms Act 2026",
+  "title_id": "C3",
+  "legislation_url": "https://www.legislation.gov.au/C3/latest/text",
+  "comp_id": "C4",
+  "effective_date": "2026-01-01",
+  "toc": [
+    {
+      "eid": "part-I",
+      "heading": "Part 1",
+      "children": [
+        {
+          "eid": "part-I__sec-6",
+          "heading": "Definitions",
+          "children": []
+        },
+        {
+          "eid": "part-I__sec-27",
+          "heading": "Restricted disclosure",
+          "children": []
+        },
+        {
+          "eid": "part-I__sec-30",
+          "heading": "General use",
+          "children": []
+        },
+        {
+          "eid": "part-I__sec-41",
+          "heading": "Inspections",
+          "children": []
+        }
+      ]
+    }
+  ],
+  "sections": {
+    "part-I__sec-6": {
+      "heading": "Definitions",
+      "html": "<p>See <span data-term=\"disclose\">disclose</span>.</p>"
+    },
+    "part-I__sec-27": {
+      "heading": "Restricted disclosure",
+      "html": "<p>In this section, <span data-term=\"disclose\">disclose</span> means to give access to protected information outside the agency.</p><p>A person must not disclose protected information to a foreign entity.</p>"
+    },
+    "part-I__sec-30": {
+      "heading": "General use",
+      "html": "<p>A person may disclose information with consent. An authorised officer may be asked to attend.</p>"
+    },
+    "part-I__sec-41": {
+      "heading": "Inspections",
+      "html": "<p>In this section, authorised officer means a person appointed in writing to inspect premises.</p><p>An authorised officer may enter the premises at any reasonable time.</p>"
+    }
+  },
+  "terms": [
+    {
+      "term": "disclose",
+      "display": "disclose",
+      "usedInBody": true,
+      "defs": [
+        {
+          "text": "means to make known to any person.",
+          "eid": "part-I__sec-6"
+        },
+        {
+          "text": "means to give access to protected information outside the agency.",
+          "eid": "part-I__sec-27",
+          "scope": "part-I__sec-27"
+        }
+      ]
+    },
+    {
+      "term": "authorised officer",
+      "display": "authorised officer",
+      "usedInBody": true,
+      "defs": [
+        {
+          "text": "means a person appointed in writing to inspect premises.",
+          "eid": "part-I__sec-41",
+          "scope": "part-I__sec-41"
+        }
+      ]
+    }
+  ],
+  "raw_xml_url": "/data/local-terms-act.xml",
+  "split_by_part": false,
+  "verification": {
+    "status": "current",
+    "checked_at": "2026-10-21"
+  }
+}

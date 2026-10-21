@@ -1,0 +1,31 @@
+{
+  "frbr_uri": "/akn/au/act/2026/1",
+  "title": "Big Split Act 2026",
+  "title_id": "C1",
+  "legislation_url": "https://www.legislation.gov.au/C1/latest/text",
+  "comp_id": "C2",
+  "effective_date": "2026-01-01",
+  "toc": [],
+  "sections": {
+    "schedule-1__clause-1": {
+      "heading": "Clause 1",
+      "html": "<p>A sealed container must be kept locked.</p>"
+    }
+  },
+  "terms": [
+    {
+      "term": "sealed container",
+      "display": "sealed container",
+      "usedInBody": true,
+      "defs": [
+        {
+          "text": "means a container closed with a tamper-evident seal.",
+          "eid": "schedule-1__clause-1",
+          "scope": "schedule-1"
+        }
+      ]
+    }
+  ],
+  "raw_xml_url": "/data/big-act-split.xml",
+  "split_by_part": true
+}

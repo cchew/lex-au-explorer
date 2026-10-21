@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
 
 test("search -> select Act -> TOC navigate -> hover shows definition", async ({ page }) => {
   await page.goto("/reader");
@@ -85,4 +86,78 @@ test("desktop keeps the TOC open with no Contents toggle", async ({ page }) => {
   await page.goto("/reader/privacy-act-1988");
   await expect(page.getByText("Contents", { exact: true })).toBeHidden();
   await expect(page.getByRole("button", { name: "Dealing with credit information" })).toBeVisible();
+});
+
+test.describe("local terms", () => {
+  const section = (page: import("@playwright/test").Page, heading: string) =>
+    page.locator(".section-content").filter({ has: page.getByRole("heading", { name: heading }) });
+
+  test("local definition popup shows pill, scope and the Act-wide line", async ({ page }) => {
+    await page.goto("/reader/local-terms-act");
+    const local = section(page, "Restricted disclosure").locator('span[data-term="disclose"][data-def-scope]');
+    await expect(local.first()).toBeVisible();
+    await local.first().hover();
+    const tooltip = page.locator(".definition-tooltip");
+    await expect(tooltip).toBeVisible({ timeout: 2000 });
+    await expect(tooltip.locator(".definition-pill")).toHaveText("Local definition");
+    await expect(tooltip).toContainText("This section only (s 27)");
+    await expect(tooltip).toContainText("means to give access to protected information outside the agency");
+    await expect(tooltip).toContainText("Differs from the Act-wide definition:");
+    await expect(tooltip).toContainText("means to make known to any person");
+    await expect(tooltip.locator(".definition-actwide-ref")).toHaveText("s 6");
+  });
+
+  test("same word outside the scope shows the Act-wide popup, no pill", async ({ page }) => {
+    await page.goto("/reader/local-terms-act");
+    const wide = section(page, "General use").locator('span[data-term="disclose"]');
+    await expect(wide.first()).toBeVisible();
+    await wide.first().hover();
+    const tooltip = page.locator(".definition-tooltip");
+    await expect(tooltip).toBeVisible({ timeout: 2000 });
+    await expect(tooltip).toContainText("means to make known to any person");
+    await expect(tooltip.locator(".definition-pill")).toHaveCount(0);
+    await expect(tooltip).not.toContainText("This section only");
+    await expect(tooltip).not.toContainText("Differs from the Act-wide definition");
+  });
+
+  test("local-only term shows pill and scope, and is not highlighted elsewhere", async ({ page }) => {
+    await page.goto("/reader/local-terms-act");
+    const inScope = section(page, "Inspections").locator('span[data-term="authorised officer"]');
+    await expect(inScope.first()).toBeVisible();
+    await inScope.first().hover();
+    const tooltip = page.locator(".definition-tooltip");
+    await expect(tooltip).toBeVisible({ timeout: 2000 });
+    await expect(tooltip.locator(".definition-pill")).toHaveText("Local definition");
+    await expect(tooltip).toContainText("This section only (s 41)");
+    await expect(tooltip.locator(".definition-actwide")).toHaveCount(0);
+
+    await expect(section(page, "General use")).toContainText("authorised officer");
+    await expect(section(page, "General use").locator('[data-term="authorised officer"]')).toHaveCount(0);
+  });
+
+  test("Schedule-local term is highlighted after navigating to the Schedule", async ({ page }) => {
+    await page.goto("/reader");
+    await page.getByPlaceholder("Search legislation by title...").fill("Big Split");
+    await page.getByTestId("search-option").filter({ hasText: "Big Split Act 2026" }).click();
+    await expect(page.getByText("Part I content.")).toBeVisible();
+    await expect(page.locator('.section-html span[data-term="sealed container"]')).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Schedule 1" }).first().click();
+    const term = page.locator('.section-html span[data-term="sealed container"][data-def-scope]');
+    await expect(term.first()).toBeVisible({ timeout: 3000 });
+    await term.first().hover();
+    const tooltip = page.locator(".definition-tooltip");
+    await expect(tooltip).toBeVisible({ timeout: 2000 });
+    await expect(tooltip.locator(".definition-pill")).toHaveText("Local definition");
+    await expect(tooltip).toContainText("This Schedule only (Schedule 1)");
+  });
+
+  test("local popup has no axe violations", async ({ page }) => {
+    await page.goto("/reader/local-terms-act");
+    const local = section(page, "Restricted disclosure").locator('span[data-term="disclose"][data-def-scope]');
+    await local.first().hover();
+    await expect(page.locator(".definition-tooltip .definition-pill")).toBeVisible({ timeout: 2000 });
+    const results = await new AxeBuilder({ page }).include(".definition-tooltip").analyze();
+    expect(results.violations).toEqual([]);
+  });
 });
