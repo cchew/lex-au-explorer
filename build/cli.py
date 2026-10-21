@@ -206,6 +206,13 @@ def build_site(
 
         if resolver:
             rows = resolver.get_act_definitions(meta.frbr_uri, include_local=True)
+            if any("scope" not in r for r in rows):
+                # lex-au-graph 0.14.x accepts include_local but omits ``scope``; its local defs
+                # would ship as Act-wide. Fail closed.
+                raise RuntimeError(
+                    "lex-au-graph returned definition rows without 'scope'; "
+                    "upgrade to a lex-au-graph whose get_act_definitions returns scope"
+                )
             def_eids = _act_wide_def_eids(rows)
             body_text = " ".join(
                 _plain_text(v["html"])
@@ -326,13 +333,16 @@ def _write_split_bundle(
             # also runs _collect_section_eids on the schedule node and writes
             # a same-named ``<schedule_eid>.json`` (last-write-wins, a latent
             # divergence bug).
-            sched_eids = _collect_section_eids(part)
+            sched_eid = part["eid"]
+
+            def _in_schedule(eid: str) -> bool:
+                return eid == sched_eid or eid.startswith(sched_eid + "__")
+
             sched_terms = [
                 dict(t)
                 for t in terms
                 if any(
-                    "scope" in d
-                    and (d["scope"] in sched_eids or d["eid"] in sched_eids)
+                    "scope" in d and (_in_schedule(d["scope"]) or _in_schedule(d["eid"]))
                     for d in t["defs"]
                 )
             ]

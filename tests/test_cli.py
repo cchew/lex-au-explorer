@@ -5,6 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import lxml.etree as ET
+import pytest
 from typer.testing import CliRunner
 
 from build.cli import (
@@ -965,3 +966,58 @@ def test_split_part_keeps_used_in_body_for_scoped_term(tmp_path):
     _write_split_bundle(tmp_path, "act", toc, sections, terms, {"title": "T"})
     part = json.loads((tmp_path / "act" / "part-I.json").read_text())
     assert part["terms"][0]["usedInBody"] is True
+
+
+def test_build_site_fails_closed_when_rows_lack_scope(tmp_path, monkeypatch):
+    """A lex-au-graph that accepts include_local but predates the row ``scope``
+    key would ship local definitions as Act-wide. Refuse instead."""
+    monkeypatch.setattr("lexaugraph.graph.LexAuGraph", _FakeGraph)
+    monkeypatch.setattr("lexaugraph.resolver.DefinitionResolver", _FakeResolver)
+    monkeypatch.setattr(
+        _FakeResolver,
+        "extra_rows",
+        [
+            {
+                "term": "disclose",
+                "display_term": "disclose",
+                "section_eid": "part-I__sec-6",
+                "definition_text": "means local thing",
+                "act_alike": False,
+            }
+        ],
+    )
+    with pytest.raises(RuntimeError, match="scope"):
+        build_site(
+            corpus_index=FIXTURES / "mini-corpus-index.json",
+            xml_dir=FIXTURES / "xml",
+            graph_path=tmp_path / "graph.json",
+            out_dir=tmp_path / "data",
+        )
+
+
+def test_split_bundle_schedule_excludes_term_without_scoped_def(tmp_path):
+    toc, sections, _ = _split_fixture(False)
+    terms = [{"term": "widget", "display": "widget",
+              "defs": [{"text": "means W", "eid": "schedule-1__clause-3"}]}]
+    _write_split_bundle(tmp_path, "act", toc, sections, terms, {"title": "T"})
+    part = json.loads((tmp_path / "act" / "schedule-1.json").read_text())
+    assert "terms" not in part
+
+
+def test_split_bundle_schedule_matches_on_scope_alone(tmp_path):
+    toc, sections, _ = _split_fixture(False)
+    # Scope names a schedule sub-node absent from the TOC; the def eid sits outside the schedule.
+    terms = [{"term": "record", "display": "record",
+              "defs": [{"text": "means R", "eid": "part-I__sec-6", "scope": "schedule-1__part-2"}]}]
+    _write_split_bundle(tmp_path, "act", toc, sections, terms, {"title": "T"})
+    part = json.loads((tmp_path / "act" / "schedule-1.json").read_text())
+    assert [t["term"] for t in part["terms"]] == ["record"]
+
+
+def test_split_bundle_schedule_excludes_term_scoped_to_other_schedule(tmp_path):
+    toc, sections, _ = _split_fixture(False)
+    terms = [{"term": "entry", "display": "entry",
+              "defs": [{"text": "means E", "eid": "schedule-10__clause-1", "scope": "schedule-10"}]}]
+    _write_split_bundle(tmp_path, "act", toc, sections, terms, {"title": "T"})
+    part = json.loads((tmp_path / "act" / "schedule-1.json").read_text())
+    assert "terms" not in part
