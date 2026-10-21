@@ -140,7 +140,6 @@ test.describe("local terms", () => {
     await page.getByPlaceholder("Search legislation by title...").fill("Big Split");
     await page.getByTestId("search-option").filter({ hasText: "Big Split Act 2026" }).click();
     await expect(page.getByText("Part I content.")).toBeVisible();
-    await expect(page.locator('.section-html span[data-term="sealed container"]')).toHaveCount(0);
 
     await page.getByRole("button", { name: "Schedule 1" }).first().click();
     const term = page.locator('.section-html span[data-term="sealed container"][data-def-scope]');
@@ -150,6 +149,14 @@ test.describe("local terms", () => {
     await expect(tooltip).toBeVisible({ timeout: 2000 });
     await expect(tooltip.locator(".definition-pill")).toHaveText("Local definition");
     await expect(tooltip).toContainText("This Schedule only (Schedule 1)");
+
+    // Back in Part I (its bundle also lists the term, scoped to the Schedule):
+    // the word is present in the text but must not be highlighted.
+    await page.mouse.move(0, 0);
+    await page.getByRole("button", { name: "Section 1" }).first().click();
+    const partText = page.locator(".section-html").filter({ hasText: "Part I content." });
+    await expect(partText).toContainText("sealed container", { timeout: 3000 });
+    await expect(partText.locator('[data-term="sealed container"]')).toHaveCount(0);
   });
 
   test("local popup has no axe violations", async ({ page }) => {
@@ -158,6 +165,23 @@ test.describe("local terms", () => {
     await local.first().hover();
     await expect(page.locator(".definition-tooltip .definition-pill")).toBeVisible({ timeout: 2000 });
     const results = await new AxeBuilder({ page }).include(".definition-tooltip").analyze();
+    expect(results.violations).toEqual([]);
+  });
+
+  // Pre-existing, not part of the local-terms feature: App.vue header/footer and
+  // SourceTrustPanel use --color-ink-3 (#8b9095, 2.85-3.03:1) at 12-13px.
+  // Excluded so this test gates only the feature's own markup; fix separately.
+  test("whole reader page with local popup open has no axe violations (excl. pre-existing ink-3 text)", async ({ page }) => {
+    await page.goto("/reader/local-terms-act");
+    const local = section(page, "Restricted disclosure").locator('span[data-term="disclose"][data-def-scope]');
+    await local.first().hover();
+    await expect(page.locator(".definition-tooltip .definition-pill")).toBeVisible({ timeout: 2000 });
+    const results = await new AxeBuilder({ page })
+      .exclude(".subtitle")
+      .exclude(".trust-meta")
+      .exclude(".trust-verify")
+      .exclude("footer")
+      .analyze();
     expect(results.violations).toEqual([]);
   });
 });
