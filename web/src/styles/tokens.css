@@ -36,6 +36,10 @@
   --chip-unsupported-text:   oklch(35% 0.14 25);
   --chip-unsupported-border: oklch(79% 0.08 25);
 
+  /* Local-definition pill (>= 4.5:1, verified in scopeLabel.spec.ts) */
+  --pill-local-bg: oklch(92% 0.04 250);
+  --pill-local-text: oklch(35% 0.12 250);
+
   /* Typography */
   --font-ui: 'Inter', system-ui, -apple-system, sans-serif;
   --font-mono: 'IBM Plex Mono', 'Fira Code', monospace;
@@ -62,4 +66,11 @@
 
   /* Motion */
   --ease-spring: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --pill-local-bg: oklch(32% 0.07 250);
+    --pill-local-text: oklch(92% 0.04 250);
+  }
 }
