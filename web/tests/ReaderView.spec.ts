@@ -852,4 +852,66 @@ describe("ReaderView", () => {
     expect(eids).toHaveLength(2);
     expect(new Set(eids)).toEqual(new Set(["part-I__sec-6", "part-II__sec-10"]));
   });
+  async function mergedXs(part1Terms: unknown[], part2Terms: unknown[]) {
+    const IDX = { ...MOCK_SPLIT_INDEX_BUNDLE_TWO_PARTS, terms: [] };
+    const PART_I = {
+      ...IDX,
+      sections: { "part-I__sec-6": { heading: "Definitions", html: "<p>x means a thing</p>" } },
+      terms: part1Terms,
+    };
+    const PART_II = {
+      ...IDX,
+      sections: { "part-II__sec-10": { heading: "Enforcement", html: "<p>the x applies here</p>" } },
+      terms: part2Terms,
+    };
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url.includes("index.json")) return jsonResponse(MOCK_SPLIT_INDEX);
+      if (url.includes("/fair-work-act-2009/part-I.json")) return jsonResponse(PART_I);
+      if (url.includes("/fair-work-act-2009/part-II.json")) return jsonResponse(PART_II);
+      return jsonResponse(IDX);
+    }));
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: "/reader", component: ReaderView }],
+    });
+    router.push("/reader");
+    await router.isReady();
+    const wrapper = mount(ReaderView, { global: { plugins: [router] } });
+    const tick = async () => {
+      await new Promise((r) => setTimeout(r, 10));
+      await wrapper.vm.$nextTick();
+      await wrapper.vm.$nextTick();
+    };
+    await tick();
+    await wrapper.find(".shortcut-btn").trigger("click");
+    await tick();
+    await tick();
+    const leaf = wrapper.findAll(".toc-leaf").find((b) => b.text() === "Enforcement");
+    expect(leaf).toBeTruthy();
+    await leaf!.trigger("click");
+    await tick();
+    const vm = wrapper.vm as unknown as ReaderVm;
+    return (vm.bundle?.terms ?? []).filter((t) => t.term === "x");
+  }
+
+  it("mergeTerms keeps two defs that share an eid but differ in scope", async () => {
+    const xs = await mergedXs(
+      [{ term: "x", display: "x", defs: [{ text: "act-wide", eid: "part-I__sec-6" }], usedInBody: false }],
+      [{ term: "x", display: "x", defs: [
+        { text: "local", eid: "part-I__sec-6", scope: "part-II" },
+        { text: "act-wide", eid: "part-I__sec-6" },
+      ], usedInBody: true }],
+    );
+    expect(xs).toHaveLength(1);
+    expect(xs[0]!.defs.map((d) => d.scope ?? "").sort()).toEqual(["", "part-II"]);
+  });
+
+  it("mergeTerms of a schedule part with terms adds them", async () => {
+    const xs = await mergedXs(
+      [],
+      [{ term: "x", display: "x", defs: [{ text: "local", eid: "part-II__sec-10", scope: "part-II" }], usedInBody: true }],
+    );
+    expect(xs).toHaveLength(1);
+    expect(xs[0]!.defs[0]!.scope).toBe("part-II");
+  });
 });

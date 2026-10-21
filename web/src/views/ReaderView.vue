@@ -74,9 +74,10 @@ watch(
 
 // Union term entries across Part loads without mutating either input: a term
 // defined in one Part and used in another must end up with one entry carrying
-// every def eid and `usedInBody` true if any contributing Part marked it so.
-// `b` defaults to [] so a Schedule part file (no `terms` key) returns a copy
-// of `a` unchanged.
+// every def and `usedInBody` true if any contributing Part marked it so. Defs
+// dedupe on (eid, scope), so a local and an Act-wide def sharing an eid both
+// survive. `b` defaults to [] so a part file without a `terms` key returns a
+// copy of `a` unchanged; Schedule part files may carry `terms` for scoped defs.
 function mergeTerms(a: TermEntry[], b: TermEntry[] = []): TermEntry[] {
   const byTerm = new Map(a.map((e) => [e.term, { ...e, defs: [...e.defs] }]));
   for (const e of b) {
@@ -85,7 +86,7 @@ function mergeTerms(a: TermEntry[], b: TermEntry[] = []): TermEntry[] {
       byTerm.set(e.term, { ...e, defs: [...e.defs] });
       continue;
     }
-    for (const d of e.defs) if (!cur.defs.some((x) => x.eid === d.eid)) cur.defs.push(d);
+    for (const d of e.defs) if (!cur.defs.some((x) => x.eid === d.eid && (x.scope ?? "") === (d.scope ?? ""))) cur.defs.push(d);
     cur.usedInBody = cur.usedInBody || e.usedInBody;
     cur.actAlike = cur.actAlike || e.actAlike;
   }
@@ -150,10 +151,9 @@ async function loadPart(slug: string, partEid: string) {
       // reader navigates between them, and a split_schedules Act keeps its
       // inline body sections when a Schedule file is pulled in. `visibleSections`
       // still filters to the active top node, so held-but-inactive entries are
-      // never mis-rendered. Schedule part files carry only `sections` (no
-      // `terms`); `mergeTerms(a, undefined)` returns a copy of `a`, so the
-      // merge is safe. A fresh `terms` array each call is deliberate: it is
-      // what refires the `bundle.value?.terms` watch to rebuild the matcher
+      // never mis-rendered. Schedule part files carry `sections` (and
+      // `terms` when they hold scoped defs); `mergeTerms` handles both. A
+      // fresh `terms` array each call is deliberate: it is what refires the `bundle.value?.terms` watch to rebuild the matcher
       // once per Part (Spec I1).
       bundle.value = {
         ...bundle.value,

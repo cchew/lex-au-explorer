@@ -113,4 +113,62 @@ describe("SectionContent", () => {
     await wrapper.trigger("mouseleave", { relatedTarget: document.body });
     expect(w.find(".tooltip-anchor").exists()).toBe(false);
   });
+  const LOCAL: TermEntry = {
+    term: "widget", display: "widget", usedInBody: true,
+    defs: [{ text: "local widget meaning.", eid: "part-I__sec-6", scope: "part-I__sec-6" }],
+  };
+
+  it("hover on a definition-section term never shows a local def outside scope", async () => {
+    const w = mount(SectionContent, { props: { ...base,
+      termIndex: new Map([["widget", LOCAL]]), matcher: buildMatcher([LOCAL]),
+      section: { heading: "Defs", html: "<p><span data-term=\"widget\">widget</span> means x.</p>" },
+      sectionEid: "part-III__sec-40" } });
+    await w.vm.$nextTick();
+    await w.find("span[data-term='widget']").trigger("mouseover");
+    vi.runAllTimers();
+    await w.vm.$nextTick();
+    expect(w.find(".definition-tooltip").exists()).toBe(false);
+  });
+
+  it("body span with data-def-scope resolves the matching def", async () => {
+    const entry: TermEntry = {
+      term: "widget", display: "widget", usedInBody: true,
+      defs: [
+        { text: "act-wide meaning.", eid: "part-I__sec-6" },
+        { text: "local meaning.", eid: "part-I__sec-6", scope: "part-II" },
+      ],
+    };
+    const w = mount(SectionContent, { props: { ...base,
+      termIndex: new Map([["widget", entry]]), matcher: buildMatcher([entry]),
+      section: { heading: "Body", html: "<p>a widget here</p>" },
+      sectionEid: "part-II__sec-9" } });
+    await w.vm.$nextTick();
+    const span = w.find("span[data-term='widget']");
+    expect(span.attributes("data-def-scope")).toBe("part-II");
+    await span.trigger("mouseover");
+    vi.runAllTimers();
+    await w.vm.$nextTick();
+    expect(w.text()).toContain("local meaning.");
+  });
+
+  it("a term entry shipped in a Schedule part carries both its local and Act-wide defs, so the popup compares them", async () => {
+    const entry: TermEntry = {
+      term: "widget", display: "widget", usedInBody: true,
+      defs: [
+        { text: "act-wide meaning.", eid: "part-I__sec-6" },
+        { text: "local meaning.", eid: "sch-1__clause-2", scope: "sch-1" },
+      ],
+    };
+    const w = mount(SectionContent, { props: { ...base,
+      termIndex: new Map([["widget", entry]]), matcher: buildMatcher([entry]),
+      section: { heading: "Sched", html: "<p>a widget here</p>" },
+      sectionEid: "sch-1__clause-3" } });
+    await w.vm.$nextTick();
+    await w.find("span[data-term='widget']").trigger("mouseover");
+    vi.runAllTimers();
+    await w.vm.$nextTick();
+    const tip = w.findComponent({ name: "DefinitionTooltip" });
+    expect(tip.props("scope")).toBe("sch-1");
+    expect(tip.props("actWide")).toEqual({ text: "act-wide meaning.", eid: "part-I__sec-6", term: "widget" });
+  });
 });

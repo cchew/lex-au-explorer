@@ -3,7 +3,7 @@ import { ref, watch, onMounted, onUnmounted, nextTick } from "vue";
 import DefinitionTooltip from "./DefinitionTooltip.vue";
 import type { TermEntry, DefEntry } from "../types";
 import type { Matcher } from "../lib/termHighlight";
-import { highlightTerms, unhighlightTerms, resolveDef, STOPLIST } from "../lib/termHighlight";
+import { highlightTerms, unhighlightTerms, resolvePair, STOPLIST } from "../lib/termHighlight";
 import { positionTooltip } from "../lib/tooltipPosition";
 import { track } from "../lib/analytics";
 
@@ -20,6 +20,7 @@ const rootRef = ref<HTMLElement | null>(null);
 const tooltipWrapperRef = ref<HTMLElement | null>(null);
 const activeDef = ref<DefEntry | null>(null);
 const activeEntry = ref<TermEntry | null>(null);
+const activeActWide = ref<{ text: string; eid: string; term: string } | undefined>(undefined);
 const anchorRect = ref<DOMRect | null>(null);
 const tooltipStyle = ref<Record<string, string>>({});
 let showTimer: ReturnType<typeof setTimeout> | null = null;
@@ -54,9 +55,18 @@ watch(
   () => nextTick(applyHighlight),
 );
 
-function pickDef(entry: TermEntry, defEid: string | undefined): DefEntry | undefined {
-  if (defEid) return entry.defs.find((d) => d.eid === defEid);
-  return resolveDef(entry, props.sectionEid) ?? entry.defs[0];
+// Body spans carry (data-def-eid, data-def-scope); definition-section hovers
+// carry neither, so resolve by scope and fall back to an Act-wide def only.
+// A scoped def outside its scope is never shown.
+function pickDef(
+  entry: TermEntry,
+  defEid: string | undefined,
+  defScope?: string,
+): DefEntry | undefined {
+  if (defEid) {
+    return entry.defs.find((d) => d.eid === defEid && (d.scope ?? "") === (defScope ?? ""));
+  }
+  return resolvePair(entry, props.sectionEid)?.winner ?? entry.defs.find((d) => d.scope === undefined);
 }
 
 function onActivate(event: Event) {
@@ -70,7 +80,7 @@ function onActivate(event: Event) {
     target.setAttribute("aria-label", `defined term: ${entry.display}`);
   }
   const defEid = target.dataset.defEid;
-  const def = pickDef(entry, defEid);
+  const def = pickDef(entry, defEid, target.dataset.defScope);
   if (!def) return;
   if (showTimer) clearTimeout(showTimer);
   // Only tracked once the tooltip actually shows (past the 200ms delay),
@@ -78,6 +88,8 @@ function onActivate(event: Event) {
   // "key interaction."
   showTimer = setTimeout(() => {
     activeDef.value = def;
+    const aw = resolvePair(entry, props.sectionEid)?.actWide;
+    activeActWide.value = aw ? { text: aw.text, eid: aw.eid, term: entry.display } : undefined;
     activeEntry.value = entry;
     anchorRect.value = target.getBoundingClientRect();
     placeTooltip();
@@ -92,6 +104,7 @@ function onActivate(event: Event) {
 function dismiss() {
   if (showTimer) clearTimeout(showTimer);
   activeDef.value = null;
+  activeActWide.value = undefined;
   activeEntry.value = null;
 }
 
@@ -143,6 +156,8 @@ onUnmounted(() => {
         :via="activeDef.via"
         :term="activeEntry?.display"
         :act-alike="activeEntry?.actAlike"
+        :scope="activeDef.scope"
+        :act-wide="activeActWide"
       />
     </div>
   </div>

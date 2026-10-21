@@ -7,6 +7,8 @@ const props = defineProps<{
   sectionEid: string;
   term?: string;
   actAlike?: boolean;
+  scope?: string;
+  actWide?: { text: string; eid: string; term: string };
   via?: { actTitle: string; sectionEid?: string; resolved: boolean };
 }>();
 
