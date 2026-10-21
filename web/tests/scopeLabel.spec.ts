@@ -61,18 +61,16 @@ function parse(v: string): [number, number, number] {
 
 describe("local pill contrast", () => {
   const css = readFileSync(resolve(process.cwd(), "src/styles/tokens.css"), "utf8");
-  const light = css.split("@media")[0]!;
-  const dark = css.slice(css.indexOf("@media"));
   const tok = (src: string, name: string): string => {
     const m = src.match(new RegExp(`--${name}:\\s*(oklch\\([^)]*\\))`));
     if (!m) throw new Error("missing token " + name);
     return m[1]!;
   };
-  it("light >= 4.5:1", () => {
-    expect(contrast(tok(light, "pill-local-bg"), tok(light, "pill-local-text"))).toBeGreaterThanOrEqual(4.5);
+  it(">= 4.5:1", () => {
+    expect(contrast(tok(css, "pill-local-bg"), tok(css, "pill-local-text"))).toBeGreaterThanOrEqual(4.5);
   });
-  it("dark >= 4.5:1", () => {
-    expect(contrast(tok(dark, "pill-local-bg"), tok(dark, "pill-local-text"))).toBeGreaterThanOrEqual(4.5);
+  it("has no dark-scheme override (the app has no dark theme; the tooltip stays white)", () => {
+    expect(css).not.toMatch(/prefers-color-scheme/);
   });
   it("sanity: black on white is 21", () => {
     expect(contrast("oklch(0% 0 0)", "oklch(100% 0 0)")).toBeCloseTo(21, 0);
