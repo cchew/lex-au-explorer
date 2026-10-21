@@ -48,13 +48,18 @@ class _FakeGraph:
 
 class _FakeResolver:
     """Stands in for lexaugraph.resolver.DefinitionResolver: only the two
-    methods build_site touches (get_act_definitions for the bundle, and
-    resolve_definition via the RefIndex term adapter)."""
+    methods build_site touches (get_act_definitions(act, include_local=False)
+    for the bundle, and resolve_definition via the RefIndex term adapter).
+    ``include_local_calls`` records the kwarg of every call."""
+
+    include_local_calls: list = []
+    extra_rows: list = []
 
     def __init__(self, graph):
         self._graph = graph
 
-    def get_act_definitions(self, act_frbr_uri):
+    def get_act_definitions(self, act_frbr_uri, include_local=False):
+        _FakeResolver.include_local_calls.append(include_local)
         if act_frbr_uri == "/akn/au/act/1988/119":
             return [
                 {
@@ -63,7 +68,9 @@ class _FakeResolver:
                     "section_eid": "part-I__sec-6",
                     "definition_text": "means information about an identified individual",
                     "act_alike": False,
-                }
+                    "scope": "act",
+                },
+                *_FakeResolver.extra_rows,
             ]
         return []
 
@@ -877,3 +884,84 @@ def test_collect_section_eids_keeps_bare_group_block_key():
         "children": [],
     }
     assert _collect_section_eids(node) == {"schedule-2__chapter-1"}
+
+
+def test_build_site_requests_local_definitions(tmp_path, monkeypatch):
+    monkeypatch.setattr("lexaugraph.graph.LexAuGraph", _FakeGraph)
+    monkeypatch.setattr("lexaugraph.resolver.DefinitionResolver", _FakeResolver)
+    monkeypatch.setattr(_FakeResolver, "include_local_calls", [])
+    monkeypatch.setattr(
+        _FakeResolver,
+        "extra_rows",
+        [
+            {
+                "term": "disclose",
+                "display_term": "disclose",
+                "section_eid": "part-I__sec-6",
+                "definition_text": "means local thing",
+                "act_alike": False,
+                "scope": "part-I__sec-6",
+            }
+        ],
+    )
+    out_dir = tmp_path / "data"
+    build_site(
+        corpus_index=FIXTURES / "mini-corpus-index.json",
+        xml_dir=FIXTURES / "xml",
+        graph_path=tmp_path / "graph.json",
+        out_dir=out_dir,
+    )
+    assert _FakeResolver.include_local_calls and all(_FakeResolver.include_local_calls)
+    bundle = json.loads((out_dir / "privacy-act-1988.json").read_text())
+    disclose = next(t for t in bundle["terms"] if t["term"] == "disclose")
+    assert disclose["defs"][0]["scope"] == "part-I__sec-6"
+    pi = next(t for t in bundle["terms"] if t["term"] == "personal information")
+    assert "scope" not in pi["defs"][0]
+
+
+def _split_fixture(scoped: bool):
+    toc = [
+        {"eid": "part-I", "children": [{"eid": "part-I__sec-6", "children": []}]},
+        {
+            "eid": "schedule-1",
+            "children": [{"eid": "schedule-1__clause-3", "children": []}],
+        },
+    ]
+    sections = {
+        "part-I__sec-6": {"html": "<p>means</p>"},
+        "schedule-1": {"html": "<p>sched</p>"},
+        "schedule-1__clause-3": {"html": "<p>clause</p>"},
+    }
+    defs = [{"text": "means A", "eid": "part-I__sec-6"}]
+    if scoped:
+        defs.append(
+            {"text": "means B", "eid": "schedule-1__clause-3", "scope": "schedule-1__clause-3"}
+        )
+    terms = [{"term": "disclose", "display": "disclose", "defs": defs}]
+    return toc, sections, terms
+
+
+def test_split_bundle_schedule_part_carries_local_term(tmp_path):
+    toc, sections, terms = _split_fixture(True)
+    _write_split_bundle(tmp_path, "act", toc, sections, terms, {"title": "T"})
+    part = json.loads((tmp_path / "act" / "schedule-1.json").read_text())
+    assert len(part["terms"]) == 1
+    assert part["terms"][0]["term"] == "disclose"
+    assert [d["text"] for d in part["terms"][0]["defs"]] == ["means A", "means B"]
+    assert set(part["sections"]) == {"schedule-1", "schedule-1__clause-3"}
+
+
+def test_split_bundle_no_scoped_terms_unchanged(tmp_path):
+    toc, sections, terms = _split_fixture(False)
+    _write_split_bundle(tmp_path, "act", toc, sections, terms, {"title": "T"})
+    part = json.loads((tmp_path / "act" / "schedule-1.json").read_text())
+    assert "terms" not in part
+
+
+def test_split_part_keeps_used_in_body_for_scoped_term(tmp_path):
+    toc, sections, terms = _split_fixture(True)
+    # Part text does not mention the term; scoped def forces usedInBody.
+    terms[0]["usedInBody"] = True
+    _write_split_bundle(tmp_path, "act", toc, sections, terms, {"title": "T"})
+    part = json.loads((tmp_path / "act" / "part-I.json").read_text())
+    assert part["terms"][0]["usedInBody"] is True

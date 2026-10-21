@@ -205,8 +205,8 @@ def build_site(
         ref_tally[meta.slug] = _tally_dict(act_tally)
 
         if resolver:
-            rows = resolver.get_act_definitions(meta.frbr_uri)
-            def_eids = {r["section_eid"] for r in rows}
+            rows = resolver.get_act_definitions(meta.frbr_uri, include_local=True)
+            def_eids = _act_wide_def_eids(rows)
             body_text = " ".join(
                 _plain_text(v["html"])
                 for k, v in sections.items()
@@ -292,6 +292,12 @@ def _write_ref_tally(out_dir: Path, ref_tally: dict[str, dict[str, int]]) -> Non
     (out_dir / "ref-tally.json").write_text(json.dumps(payload))
 
 
+def _act_wide_def_eids(rows: list[dict]) -> set[str]:
+    """Sections holding Act-wide definitions, excluded from body_text. Sections
+    holding only local (scoped) definitions still count as body text."""
+    return {r["section_eid"] for r in rows if r.get("scope", "act") == "act"}
+
+
 def _plain_text(html: str) -> str:
     """Strip tags from build-generated section HTML for a surface-form scan.
     The HTML is well-formed and machine-emitted, so a tag strip is enough --
@@ -320,7 +326,17 @@ def _write_split_bundle(
             # also runs _collect_section_eids on the schedule node and writes
             # a same-named ``<schedule_eid>.json`` (last-write-wins, a latent
             # divergence bug).
-            _write_schedule_parts(part_dir, part, sections)
+            sched_eids = _collect_section_eids(part)
+            sched_terms = [
+                dict(t)
+                for t in terms
+                if any(
+                    "scope" in d
+                    and (d["scope"] in sched_eids or d["eid"] in sched_eids)
+                    for d in t["defs"]
+                )
+            ]
+            _write_schedule_parts(part_dir, part, sections, sched_terms)
             continue
         # A split Act can carry two top-level TOC nodes with the same eId
         # (Corp Act has two ``chapter-7``; ITAA-97 repeats ``chapter-2`` /
@@ -344,7 +360,7 @@ def _write_split_bundle(
             if not (defined_here or used_here):
                 continue
             copy = dict(t)
-            if used_here:
+            if used_here or any("scope" in d for d in t["defs"]):
                 copy["usedInBody"] = True
             else:
                 copy.pop("usedInBody", None)
@@ -390,17 +406,22 @@ def _collect_section_eids(toc_node: dict) -> set[str]:
 
 
 def _write_schedule_parts(
-    part_dir: Path, schedule_node: dict, sections: dict[str, dict]
+    part_dir: Path,
+    schedule_node: dict,
+    sections: dict[str, dict],
+    terms: Optional[list[dict]] = None,
 ) -> None:
     """Write ``part_dir/<schedule_eid>.json`` = ``{"sections": {...}}`` for
     every unit eId at-or-under ``schedule_node`` that is present in
-    ``sections`` (Task 9). No ``definitions`` key: schedule clauses carry no
-    ``data-term`` markers in this corpus, so the reader needs none."""
+    ``sections`` (Task 9). ``terms`` (split-by-part only) are the term entries
+    with a scoped definition inside this schedule; a ``terms`` key is written
+    only when non-empty, so Acts without scoped defs are unchanged."""
     eids = _collect_section_eids(schedule_node)
     sched_sections = {k: sections[k] for k in eids if k in sections}
-    (part_dir / f"{schedule_node['eid']}.json").write_text(
-        json.dumps({"sections": sched_sections})
-    )
+    payload: dict = {"sections": sched_sections}
+    if terms:
+        payload["terms"] = terms
+    (part_dir / f"{schedule_node['eid']}.json").write_text(json.dumps(payload))
 
 
 @app.command()

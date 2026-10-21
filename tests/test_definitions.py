@@ -52,3 +52,41 @@ def test_build_terms_omits_flags_when_false():
     assert "usedInBody" not in terms[0]
     assert "actAlike" not in terms[0]
     assert len(terms) == 1  # NOT dropped from the bundle
+
+
+def _row(eid, scope=None, term="use"):
+    r = {"term": term, "display_term": term, "section_eid": eid,
+         "definition_text": "means x", "act_alike": False}
+    if scope is not None:
+        r["scope"] = scope
+    return r
+
+
+def test_build_terms_carries_scope_only_for_local():
+    terms = build_terms([_row("sec-3", "act"), _row("part-1__sec-5", "part-1__sec-5")], "")
+    defs = {d["eid"]: d for d in terms[0]["defs"]}
+    assert "scope" not in defs["sec-3"]
+    assert defs["part-1__sec-5"]["scope"] == "part-1__sec-5"
+
+
+def test_build_terms_same_eid_different_scope_kept():
+    terms = build_terms([_row("sec-3", "b"), _row("sec-3", "a")], "")
+    assert [d["scope"] for d in terms[0]["defs"]] == ["a", "b"]
+
+
+def test_build_terms_local_forces_used_in_body():
+    terms = build_terms([_row("sec-3", "sec-3")], "nothing relevant")
+    assert terms[0]["usedInBody"] is True
+
+
+def test_body_text_keeps_local_def_sections(tmp_path, monkeypatch):
+    # def_eids must come only from Act-wide rows: a section holding a local def
+    # stays in body_text, so an Act-wide term used there keeps usedInBody.
+    from build.cli import _act_wide_def_eids
+
+    rows = [_row("sec-1", "act", term="widget"), _row("sec-2", "sec-2", term="gadget")]
+    assert _act_wide_def_eids(rows) == {"sec-1"}
+    # rows without a scope key are Act-wide (older graph)
+    assert _act_wide_def_eids([_row("sec-9")]) == {"sec-9"}
+    terms = build_terms(rows, "the widget in sec-2 text")
+    assert next(t for t in terms if t["term"] == "widget")["usedInBody"] is True

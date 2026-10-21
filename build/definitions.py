@@ -47,15 +47,18 @@ def build_terms(rows: list[dict], body_text: str) -> list[dict]:
             d["via"] = {"actTitle": via["act_title"], "resolved": via["resolved"]}
             if via.get("section_eid"):
                 d["via"]["sectionEid"] = via["section_eid"]
+        scope = r.get("scope", "act")
+        if scope != "act":
+            d["scope"] = scope
         t["defs"].append(d)
         t["_actAlike"] = t["_actAlike"] or bool(r.get("act_alike"))
     out: list[dict] = []
     for t in grouped.values():
-        t["defs"].sort(key=lambda d: d["eid"])
+        t["defs"].sort(key=lambda d: (d["eid"], d.get("scope") or ""))
         entry = {"term": t["term"], "display": t["display"], "defs": t["defs"]}
         if t["_actAlike"]:
             entry["actAlike"] = True
-        if _used_in_body(t["term"], body_lower):
+        if any("scope" in d for d in t["defs"]) or _used_in_body(t["term"], body_lower):
             entry["usedInBody"] = True
         out.append(entry)
     return sorted(out, key=lambda e: e["term"])

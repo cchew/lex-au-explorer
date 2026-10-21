@@ -19,6 +19,8 @@ export interface SectionEntry {
 export interface DefEntry {
   text: string;
   eid: string;
+  /** Container eId the definition is local to; absent means Act-wide. */
+  scope?: string;
   via?: { actTitle: string; sectionEid?: string; resolved: boolean };
 }
 
