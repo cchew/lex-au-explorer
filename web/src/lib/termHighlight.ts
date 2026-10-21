@@ -65,8 +65,15 @@ function containmentPrefix(eid: string): string {
   return i === -1 ? "" : eid.slice(0, i);
 }
 
-export function resolveDef(entry: TermEntry, sectionEid: string): DefEntry | null {
-  const c = entry.defs;
+export function stripDisambig(eid: string): string {
+  return eid.split("__").map((c) => c.replace(/~\d+$/, "")).join("__");
+}
+
+function inScope(sectionEid: string, scope: string): boolean {
+  return sectionEid === scope || sectionEid.startsWith(scope + "__");
+}
+
+function resolveActWide(c: DefEntry[], sectionEid: string): DefEntry | null {
   if (c.length === 1) return c[0]!;
   const exact = c.find((d) => d.eid === sectionEid);
   if (exact) return exact;
@@ -81,6 +88,30 @@ export function resolveDef(entry: TermEntry, sectionEid: string): DefEntry | nul
     }
   }
   return best;
+}
+
+export function resolvePair(
+  entry: TermEntry,
+  sectionEid: string,
+): { winner: DefEntry; actWide: DefEntry | null } | null {
+  const actWide = resolveActWide(entry.defs.filter((d) => d.scope === undefined), sectionEid);
+  const key = stripDisambig(sectionEid);
+  let local: DefEntry | null = null;
+  let localLen = -1;
+  for (const d of entry.defs) {
+    if (d.scope === undefined) continue;
+    const sc = stripDisambig(d.scope);
+    if (inScope(key, sc) && sc.length > localLen) {
+      local = d;
+      localLen = sc.length;
+    }
+  }
+  const winner = local ?? actWide;
+  return winner ? { winner, actWide } : null;
+}
+
+export function resolveDef(entry: TermEntry, sectionEid: string): DefEntry | null {
+  return resolvePair(entry, sectionEid)?.winner ?? null;
 }
 
 const SKIP_SELECTOR =
@@ -107,12 +138,13 @@ export function highlightTerms(
     for (let mm = m.regex.exec(text); mm; mm = m.regex.exec(text)) {
       const entry = m.lookup.get(mm[0].toLowerCase());
       if (!entry) continue;
-      if (opts.stoplist.has(entry.term)) continue;
       const def = resolveDef(entry, sectionEid);
       if (!def) continue;
+      if (def.scope === undefined && opts.stoplist.has(entry.term)) continue;
       const span = document.createElement("span");
       span.dataset.term = entry.term;
       span.dataset.defEid = def.eid;
+      span.dataset.defScope = def.scope ?? "";
       span.textContent = mm[0];
       span.tabIndex = 0;
       span.setAttribute("role", "button");
