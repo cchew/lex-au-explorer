@@ -4,6 +4,7 @@ export interface Matcher {
   regex: RegExp;
   lookup: Map<string, TermEntry>;
   byTerm: Map<string, TermEntry>;
+  entries: TermEntry[];
 }
 
 export const STOPLIST: ReadonlySet<string> = new Set([
@@ -41,6 +42,10 @@ export function surfaceForms(term: string): string[] {
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 export function buildMatcher(terms: TermEntry[]): Matcher {
+  return compileMatcher(terms);
+}
+
+function compileMatcher(terms: TermEntry[]): Matcher {
   const lookup = new Map<string, TermEntry>();
   const byTerm = new Map<string, TermEntry>();
   const forms: string[] = [];
@@ -57,7 +62,7 @@ export function buildMatcher(terms: TermEntry[]): Matcher {
   const regex = forms.length
     ? new RegExp("\\b(" + forms.map(escapeRe).join("|") + ")\\b", "gi")
     : /$a^/g; // matches nothing
-  return { regex, lookup, byTerm };
+  return { regex, lookup, byTerm, entries: terms };
 }
 
 function containmentPrefix(eid: string): string {
@@ -114,16 +119,48 @@ export function resolveDef(entry: TermEntry, sectionEid: string): DefEntry | nul
   return resolvePair(entry, sectionEid)?.winner ?? null;
 }
 
+const sectionCache = new WeakMap<Matcher, Map<string, Matcher>>();
+
+/**
+ * The matcher for one section: `base` minus every entry with no applicable def here (a local term
+ * outside its scope) and every stoplisted entry whose winner is Act-wide. Dropping them up front lets
+ * the longest remaining surface form win, so an inapplicable longer term never shadows a shorter one
+ * inside it. Sections with the same omitted set share one cached matcher.
+ */
+export function sectionMatcher(base: Matcher, sectionEid: string, stoplist: ReadonlySet<string>): Matcher {
+  const omitted: string[] = [];
+  const kept: TermEntry[] = [];
+  for (const entry of base.entries) {
+    const pair = resolvePair(entry, sectionEid);
+    if (!pair || (pair.winner.scope === undefined && stoplist.has(entry.term))) omitted.push(entry.term);
+    else kept.push(entry);
+  }
+  if (!omitted.length) return base;
+  const key = omitted.sort().join("\u0000");
+  let byKey = sectionCache.get(base);
+  if (!byKey) {
+    byKey = new Map();
+    sectionCache.set(base, byKey);
+  }
+  let m = byKey.get(key);
+  if (!m) {
+    m = compileMatcher(kept);
+    byKey.set(key, m);
+  }
+  return m;
+}
+
 const SKIP_SELECTOR =
   "[data-term],a,.akn-ref,h1,h2,h3,h4,h5,h6,.akn-provision-heading,.akn-note-label,.akn-notetext,.akn-date,.akn-quantity,sup,sub";
 
 export function highlightTerms(
   root: HTMLElement,
-  m: Matcher,
+  base: Matcher,
   sectionEid: string,
   opts: { stoplist: ReadonlySet<string> },
 ): void {
   if (root.dataset.thDone === "1") return;
+  const m = sectionMatcher(base, sectionEid, opts.stoplist);
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   const targets: Text[] = [];
   for (let n = walker.nextNode(); n; n = walker.nextNode()) {

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
-import { surfaceForms, buildMatcher, resolveDef, resolvePair, stripDisambig, highlightTerms, unhighlightTerms, STOPLIST } from "../src/lib/termHighlight";
+import { surfaceForms, buildMatcher, resolveDef, resolvePair, stripDisambig, highlightTerms, unhighlightTerms, sectionMatcher, STOPLIST } from "../src/lib/termHighlight";
 import type { TermEntry } from "../src/types";
 
 const T = (term: string, defs: [string, string, string?][], extra: Partial<TermEntry> = {}): TermEntry =>
@@ -177,5 +177,80 @@ describe("buildMatcher + highlightTerms", () => {
     highlightTerms(root, m, "sec-1", { stoplist: new Set(["person"]) });
     expect(root.querySelectorAll("span[data-term='person']").length).toBe(0);
     expect((root.querySelector("span[data-term='associate']") as HTMLElement).dataset.defScope).toBe("");
+  });
+});
+
+describe("per-section matcher (out-of-scope local terms do not shadow Act-wide ones)", () => {
+  const mk = (html: string) => { const d = document.createElement("div"); d.innerHTML = html; return d; };
+  const terms = () => [
+    T("eligible data breach", [["L", "sec-5", "sec-5"]]),
+    T("data breach", [["A", "sec-2"]]),
+  ];
+
+  it("outside the scope the shorter Act-wide term highlights with the Act-wide def", () => {
+    const m = buildMatcher(terms());
+    const root = mk("<p>An eligible data breach occurs.</p>");
+    highlightTerms(root, m, "sec-9", { stoplist: new Set() });
+    const spans = Array.from(root.querySelectorAll("span[data-term]")) as HTMLElement[];
+    expect(spans.map((s) => [s.textContent, s.dataset.term, s.dataset.defEid, s.dataset.defScope])).toEqual([
+      ["data breach", "data breach", "sec-2", ""],
+    ]);
+  });
+
+  it("inside the scope the whole phrase highlights with the local def", () => {
+    const m = buildMatcher(terms());
+    const root = mk("<p>An eligible data breach occurs.</p>");
+    highlightTerms(root, m, "sec-5", { stoplist: new Set() });
+    const spans = Array.from(root.querySelectorAll("span[data-term]")) as HTMLElement[];
+    expect(spans.map((s) => [s.textContent, s.dataset.term, s.dataset.defScope])).toEqual([
+      ["eligible data breach", "eligible data breach", "sec-5"],
+    ]);
+  });
+
+  it("a stoplisted Act-wide term no longer shadows a shorter term inside it", () => {
+    const m = buildMatcher([T("personal record", [["A", "sec-1"]]), T("record", [["R", "sec-1"]])]);
+    const root = mk("<p>A personal record here.</p>");
+    highlightTerms(root, m, "sec-1", { stoplist: new Set(["personal record"]) });
+    const spans = Array.from(root.querySelectorAll("span[data-term]")) as HTMLElement[];
+    expect(spans.map((s) => s.dataset.term)).toEqual(["record"]);
+  });
+
+  it("stoplisted Act-wide-only term is still not highlighted", () => {
+    const m = buildMatcher([T("person", [["A", "sec-1"]])]);
+    const root = mk("<p>A person.</p>");
+    highlightTerms(root, m, "sec-1", { stoplist: new Set(["person"]) });
+    expect(root.querySelectorAll("span[data-term]").length).toBe(0);
+  });
+
+  it("sections with the same omitted set share one matcher; nothing omitted returns the base", () => {
+    const m = buildMatcher(terms());
+    const a = sectionMatcher(m, "sec-9", new Set());
+    const b = sectionMatcher(m, "sec-10", new Set());
+    expect(a).not.toBe(m);
+    expect(a).toBe(b);
+    expect(sectionMatcher(m, "sec-5", new Set())).toBe(m);
+  });
+});
+
+describe("resolvePair with several Act-wide defs plus a local def", () => {
+  const e = T("x", [
+    ["P1", "part-1__sec-3"],
+    ["P2", "part-2__div-1__sec-20"],
+    ["P2b", "part-2__sec-10"],
+    ["L", "part-2__div-1__sec-25", "part-2__div-1__sec-25"],
+  ]);
+
+  it("actWide follows exact, then nearest containment prefix", () => {
+    expect(resolvePair(e, "part-1__sec-3")!.actWide!.text).toBe("P1");
+    expect(resolvePair(e, "part-1__sec-4")!.actWide!.text).toBe("P1");
+    expect(resolvePair(e, "part-2__div-1__sec-21")!.actWide!.text).toBe("P2");
+    expect(resolvePair(e, "part-2__sec-11")!.actWide!.text).toBe("P2b");
+    expect(resolvePair(e, "part-3__sec-1")).toBeNull();
+  });
+
+  it("local wins inside its scope while actWide still reports the nearest Act-wide def", () => {
+    const r = resolvePair(e, "part-2__div-1__sec-25")!;
+    expect(r.winner.text).toBe("L");
+    expect(r.actWide!.text).toBe("P2");
   });
 });
