@@ -69,6 +69,21 @@ describe("local pill contrast", () => {
   it(">= 4.5:1", () => {
     expect(contrast(tok(css, "pill-local-bg"), tok(css, "pill-local-text"))).toBeGreaterThanOrEqual(4.5);
   });
+  // Every text use of --color-ink-3 and the background it sits on:
+  // .subtitle/footer on page bg, .trust-meta/.trust-verify on trust panel
+  // (surface-raised), tooltip via/citation on surface, missing-figure on bg/surface.
+  const ink3Pairs: Array<[string, string]> = [
+    ["color-bg", "page bg: .subtitle, footer, .version, missing figure"],
+    ["color-surface", "tooltip .definition-via/.definition-citation, missing figure"],
+    ["color-surface-raised", ".trust-meta, .trust-verify"],
+  ];
+  it.each(ink3Pairs)("ink-3 on %s >= 4.5:1 (%s)", (bg) => {
+    expect(contrast(tok(css, "color-ink-3"), tok(css, bg))).toBeGreaterThanOrEqual(4.5);
+  });
+  it("keeps ink-3 lighter than ink-2 (hierarchy)", () => {
+    const bg = tok(css, "color-surface");
+    expect(contrast(tok(css, "color-ink-3"), bg)).toBeLessThan(contrast(tok(css, "color-ink-2"), bg));
+  });
   it("has no dark-scheme override (the app has no dark theme; the tooltip stays white)", () => {
     expect(css).not.toMatch(/prefers-color-scheme/);
   });

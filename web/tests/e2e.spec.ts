@@ -168,20 +168,12 @@ test.describe("local terms", () => {
     expect(results.violations).toEqual([]);
   });
 
-  // Pre-existing, not part of the local-terms feature: App.vue header/footer and
-  // SourceTrustPanel use --color-ink-3 (#8b9095, 2.85-3.03:1) at 12-13px.
-  // Excluded so this test gates only the feature's own markup; fix separately.
-  test("whole reader page with local popup open has no axe violations (excl. pre-existing ink-3 text)", async ({ page }) => {
+  test("whole reader page with local popup open has no axe violations", async ({ page }) => {
     await page.goto("/reader/local-terms-act");
     const local = section(page, "Restricted disclosure").locator('span[data-term="disclose"][data-def-scope]');
     await local.first().hover();
     await expect(page.locator(".definition-tooltip .definition-pill")).toBeVisible({ timeout: 2000 });
-    const results = await new AxeBuilder({ page })
-      .exclude(".subtitle")
-      .exclude(".trust-meta")
-      .exclude(".trust-verify")
-      .exclude("footer")
-      .analyze();
+    const results = await new AxeBuilder({ page }).analyze();
     expect(results.violations).toEqual([]);
   });
 });

@@ -9,7 +9,7 @@
   /* Text */
   --color-ink: oklch(15% 0.01 250);
   --color-ink-2: oklch(45% 0.01 250);
-  --color-ink-3: oklch(65% 0.01 250);
+  --color-ink-3: oklch(53% 0.01 250);
 
   /* Borders */
   --color-border: oklch(88% 0.008 80);
