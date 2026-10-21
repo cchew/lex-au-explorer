@@ -1021,3 +1021,49 @@ def test_split_bundle_schedule_excludes_term_scoped_to_other_schedule(tmp_path):
     _write_split_bundle(tmp_path, "act", toc, sections, terms, {"title": "T"})
     part = json.loads((tmp_path / "act" / "schedule-1.json").read_text())
     assert "terms" not in part
+
+
+_LOCAL_SCOPE_ACT = """<?xml version='1.0' encoding='UTF-8'?>
+<akomaNtoso xmlns="http://docs.oasis-open.org/legaldocml/ns/akn/3.0"><act name="act">
+<meta><identification source="#lex-au">
+<FRBRWork><FRBRthis value="/akn/au/act/2026/1/!main"/><FRBRuri value="/akn/au/act/2026/1"/>
+<FRBRdate date="2026-01-01" name="Generation"/><FRBRauthor href="#parliament"/></FRBRWork>
+<FRBRExpression><FRBRthis value="/akn/au/act/2026/1/eng@2026-01-01/!main"/>
+<FRBRuri value="/akn/au/act/2026/1/eng@2026-01-01"/><FRBRdate date="2026-01-01" name="Generation"/>
+<FRBRauthor href="#parliament"/><FRBRlanguage language="eng"/></FRBRExpression>
+<FRBRManifestation><FRBRthis value="/akn/au/act/2026/1/eng@2026-01-01/!main.xml"/>
+<FRBRuri value="/akn/au/act/2026/1/eng@2026-01-01.xml"/><FRBRdate date="2026-01-01" name="Generation"/>
+<FRBRauthor href="#lex-au"/></FRBRManifestation></identification></meta>
+<body><part eId="part-I"><num>I</num><heading>Preliminary</heading>
+<section eId="part-I__sec-2"><num>2</num><heading>Definitions</heading><content>
+<p><term refersTo="#term-use">use</term> means <def>apply for any purpose.</def></p></content></section>
+<section eId="part-I__sec-5"><num>5</num><heading>Confidential</heading><content>
+<p><term refersTo="#term-use--part-I__sec-5">use</term> means <def>make use of the information.</def></p>
+</content></section></part></body></act></akomaNtoso>
+"""
+
+
+def test_lexaugraph_resolver_accepts_include_local():
+    pytest.importorskip("lexaugraph", reason="lexaugraph not importable")
+    import inspect
+
+    from lexaugraph.resolver import DefinitionResolver
+
+    params = inspect.signature(DefinitionResolver.get_act_definitions).parameters
+    assert "include_local" in params, "installed lex-au-graph is older than the local-scope release; reinstall it"
+
+
+def test_lexaugraph_local_rows_carry_scope(tmp_path):
+    pytest.importorskip("lexaugraph", reason="lexaugraph not importable")
+    from lexaugraph.graph import LexAuGraph
+    from lexaugraph.loader import parse_act
+    from lexaugraph.resolver import DefinitionResolver
+
+    xml = tmp_path / "local-scope-act.xml"
+    xml.write_text(_LOCAL_SCOPE_ACT)
+    entry = {"name": "Local Scope Act 2026", "year": 2026, "number": 1,
+             "effective_date": "2026-01-01", "xml_path": "xml/local-scope-act.xml"}
+    g = LexAuGraph()
+    g.add_act_data(parse_act(xml, entry))
+    rows = DefinitionResolver(g).get_act_definitions("/akn/au/act/2026/1", include_local=True)
+    assert {r["scope"] for r in rows} == {"act", "part-I__sec-5"}
