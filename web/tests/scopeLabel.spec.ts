@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { scopeLabel, normaliseDef } from "../src/lib/scopeLabel";
+import { scopeLabel, normaliseDef, buildScopeLookup, isRegulationTitle } from "../src/lib/scopeLabel";
 
 describe("scopeLabel", () => {
   const cases: Array<[string, string, string, string]> = [
@@ -18,6 +18,88 @@ describe("scopeLabel", () => {
   });
   it("uses the last component", () => {
     expect(scopeLabel("part-2__sec-9").text).toBe("s 9");
+  });
+});
+
+describe("scopeLabel with a printed-heading lookup", () => {
+  const headings: Record<string, string> = {
+    "schedule-3": "Schedule 8 \u2014 Transitional rules",
+    "schedule-4": "Schedule\u00a09",
+    "schedule-1": "Schedule 1",
+    "schedule-1__part-5": "5 Identifying detainees",
+    "schedule-1__part-5__dvs-2": "2 Reviews",
+    "part-I": "Part 1",
+    "part-I__dvs-1": "Division 1 General",
+    "schedule-3__part-2": "2 Seals",
+    "schedule-3__part-2__item-1": "38 Sealing of containers",
+    "schedule-4__clause-7": "Clause 12 Notices",
+    "schedule-5": "Schedule to be inserted",
+    "schedule-6": "Schedule I\u2014 Forms",
+    "part-II__sec-9": "9A Something",
+  };
+  const lookup = (eid: string): string | undefined => headings[eid];
+
+  it("uses the printed Schedule number, not the eId position", () => {
+    expect(scopeLabel("schedule-3", lookup)).toEqual({
+      kind: "schedule", text: "Schedule 8", phrase: "This Schedule only (Schedule 8)",
+    });
+    expect(scopeLabel("schedule-4", lookup).text).toBe("Schedule 9");
+    expect(scopeLabel("schedule-6", lookup).text).toBe("Schedule I");
+  });
+  it("keeps the eId number when the heading carries no printed number", () => {
+    expect(scopeLabel("schedule-5", lookup).text).toBe("Schedule 5");
+    expect(scopeLabel("schedule-9", lookup).text).toBe("Schedule 9");
+  });
+  it("prefixes the Schedule on Schedule Parts and Divisions", () => {
+    expect(scopeLabel("schedule-1__part-5", lookup)).toEqual({
+      kind: "part", text: "Schedule 1, Part 5", phrase: "This Part only (Schedule 1, Part 5)",
+    });
+    expect(scopeLabel("schedule-1__part-5__dvs-2", lookup).text).toBe("Schedule 1, Part 5, Division 2");
+  });
+  it("uses the printed Part and Division number outside Schedules", () => {
+    expect(scopeLabel("part-I", lookup).text).toBe("Part 1");
+    expect(scopeLabel("part-I__dvs-1", lookup).text).toBe("Division 1");
+  });
+  it("labels an item scope with its printed item number", () => {
+    expect(scopeLabel("schedule-3__part-2__item-1", lookup)).toEqual({
+      kind: "other",
+      text: "Schedule 8, Part 2, item 38",
+      phrase: "This item only (Schedule 8, Part 2, item 38)",
+    });
+  });
+  it("uses the printed clause number", () => {
+    expect(scopeLabel("schedule-4__clause-7", lookup).text).toBe("Schedule 9, clause 12");
+  });
+  it("labels regulations with r", () => {
+    expect(scopeLabel("part-II__sec-9", lookup, { regulation: true })).toEqual({
+      kind: "section", text: "r 9", phrase: "This regulation only (r 9)",
+    });
+    expect(scopeLabel("sec-27", undefined, { regulation: true }).text).toBe("r 27");
+    expect(scopeLabel("sec-27").text).toBe("s 27");
+  });
+  it("falls back to eId parsing on a lookup miss", () => {
+    expect(scopeLabel("schedule-1__clause-3", () => undefined).text).toBe("Schedule 1, clause 3");
+    expect(scopeLabel("part-2", () => undefined).text).toBe("Part 2");
+  });
+});
+
+describe("buildScopeLookup / isRegulationTitle", () => {
+  it("prefers toc headings, falls back to live section headings", () => {
+    let sections: Record<string, { heading: string; html: string }> = {};
+    const lookup = buildScopeLookup(
+      [{ eid: "schedule-3", heading: "Schedule 8", children: [{ eid: "schedule-3__item-1", heading: "38 X", children: [] }] }],
+      () => sections,
+    );
+    expect(lookup("schedule-3")).toBe("Schedule 8");
+    expect(lookup("schedule-3__item-1")).toBe("38 X");
+    expect(lookup("part-I__sec-4")).toBeUndefined();
+    sections = { "part-I__sec-4": { heading: "4 Y", html: "" } };
+    expect(lookup("part-I__sec-4")).toBe("4 Y");
+  });
+  it("detects regulation titles only", () => {
+    expect(isRegulationTitle("Civil Aviation Safety Regulations 1998")).toBe(true);
+    expect(isRegulationTitle("Privacy Act 1988")).toBe(false);
+    expect(isRegulationTitle("Regulations Repeal Act 2020")).toBe(false);
   });
 });
 

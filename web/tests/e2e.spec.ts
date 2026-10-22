@@ -135,6 +135,19 @@ test.describe("local terms", () => {
     await expect(section(page, "General use").locator('[data-term="authorised officer"]')).toHaveCount(0);
   });
 
+  test("item scope label uses the printed Schedule and item numbers, not the eId positions", async ({ page }) => {
+    await page.goto("/reader/local-terms-act");
+    await page.getByRole("button", { name: "Schedule 8" }).first().click();
+    const term = page.locator('.section-html span[data-term="sealed container"][data-def-scope]');
+    await expect(term.first()).toBeVisible({ timeout: 3000 });
+    await term.first().hover();
+    const tooltip = page.locator(".definition-tooltip");
+    await expect(tooltip).toBeVisible({ timeout: 2000 });
+    await expect(tooltip).toContainText("This item only (Schedule 8, Part 2, item 38)");
+    await expect(tooltip).not.toContainText("schedule-3");
+    await expect(tooltip).not.toContainText("item-1");
+  });
+
   test("Schedule-local term is highlighted after navigating to the Schedule", async ({ page }) => {
     await page.goto("/reader");
     await page.getByPlaceholder("Search legislation by title...").fill("Big Split");

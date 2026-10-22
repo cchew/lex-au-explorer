@@ -31,6 +31,23 @@
           "children": []
         }
       ]
+    },
+    {
+      "eid": "schedule-3",
+      "heading": "Schedule 8 \u2014 Container rules",
+      "children": [
+        {
+          "eid": "schedule-3__part-2",
+          "heading": "2 Seals",
+          "children": [
+            {
+              "eid": "schedule-3__part-2__item-1",
+              "heading": "38 Sealing of containers",
+              "children": []
+            }
+          ]
+        }
+      ]
     }
   ],
   "sections": {
@@ -49,6 +66,10 @@
     "part-I__sec-41": {
       "heading": "Inspections",
       "html": "<p>In this section, authorised officer means a person appointed in writing to inspect premises.</p><p>An authorised officer may enter the premises at any reasonable time.</p>"
+    },
+    "schedule-3__part-2__item-1": {
+      "heading": "38 Sealing of containers",
+      "html": "<p>A sealed container must be kept locked.</p>"
     }
   },
   "terms": [
@@ -77,6 +98,18 @@
           "text": "means a person appointed in writing to inspect premises.",
           "eid": "part-I__sec-41",
           "scope": "part-I__sec-41"
+        }
+      ]
+    },
+    {
+      "term": "sealed container",
+      "display": "sealed container",
+      "usedInBody": true,
+      "defs": [
+        {
+          "text": "means a container closed with a tamper-evident seal.",
+          "eid": "schedule-3__part-2__item-1",
+          "scope": "schedule-3__part-2__item-1"
         }
       ]
     }

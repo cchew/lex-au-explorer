@@ -2,6 +2,7 @@
 import { ref, watch, onMounted, onUnmounted, nextTick } from "vue";
 import DefinitionTooltip from "./DefinitionTooltip.vue";
 import type { TermEntry, DefEntry } from "../types";
+import type { ScopeLookup } from "../lib/scopeLabel";
 import type { Matcher } from "../lib/termHighlight";
 import { highlightTerms, unhighlightTerms, resolvePair, STOPLIST } from "../lib/termHighlight";
 import { positionTooltip } from "../lib/tooltipPosition";
@@ -14,6 +15,8 @@ const props = defineProps<{
   sectionEid: string;
   highlightEnabled: boolean;
   slug?: string;
+  scopeLookup?: ScopeLookup;
+  regulation?: boolean;
 }>();
 
 const rootRef = ref<HTMLElement | null>(null);
@@ -157,6 +160,8 @@ onUnmounted(() => {
         :term="activeEntry?.display"
         :act-alike="activeEntry?.actAlike"
         :scope="activeDef.scope"
+        :scope-lookup="scopeLookup"
+        :regulation="regulation"
         :act-wide="activeActWide"
       />
     </div>

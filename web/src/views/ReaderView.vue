@@ -10,6 +10,7 @@ import SourceTrustPanel from "../components/SourceTrustPanel.vue";
 import type { ActBundle, SectionEntry, TocNode, TermEntry } from "../types";
 import { buildMatcher, type Matcher } from "../lib/termHighlight";
 import { track } from "../lib/analytics";
+import { buildScopeLookup, isRegulationTitle } from "../lib/scopeLabel";
 
 const route = useRoute();
 const bundle = ref<ActBundle | null>(null);
@@ -28,6 +29,13 @@ const loadedGroups = ref<Set<string>>(new Set());
 const matcher = shallowRef<Matcher | null>(null);
 const termIndex = shallowRef<Map<string, TermEntry>>(new Map());
 const highlightEnabled = ref(readHighlightToggle());
+
+// Printed labels for scope popups come from the loaded bundle: toc headings
+// (indexed once per toc) then live section headings.
+const scopeLookup = computed(() =>
+  bundle.value ? buildScopeLookup(bundle.value.toc, () => bundle.value?.sections) : undefined,
+);
+const isRegulation = computed(() => (bundle.value ? isRegulationTitle(bundle.value.title) : false));
 
 // Below this width the TOC stacks above the content as a collapsible block.
 const narrowQuery: MediaQueryList | null =
@@ -349,6 +357,8 @@ onMounted(() => {
             :section="s.section"
             :matcher="matcher"
             :term-index="termIndex"
+            :scope-lookup="scopeLookup"
+            :regulation="isRegulation"
             :section-eid="s.eid"
             :highlight-enabled="highlightEnabled"
             :slug="currentSlug ?? undefined"

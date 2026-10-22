@@ -62,6 +62,15 @@ describe("DefinitionTooltip", () => {
       expect(w.text()).toContain("This section only (s 27)");
       expect(w.text()).not.toContain("Differs");
     });
+    it("uses the lookup for printed numbers and r for regulations", () => {
+      const lookup = (eid: string): string | undefined =>
+        eid === "schedule-3" ? "Schedule 8 \u2014 Rules" : eid === "schedule-3__item-1" ? "38 Sealing" : undefined;
+      const w = mount(DefinitionTooltip, {
+        props: { ...base, scope: "schedule-3__item-1", scopeLookup: lookup, actWide: { ...wide, eid: "part-I__sec-6" }, regulation: true },
+      });
+      expect(w.text()).toContain("This item only (Schedule 8, item 38)");
+      expect(w.get(".definition-actwide-ref").text()).toBe("r 6");
+    });
     it("hides the Act Alike link for a local winner", () => {
       const w = mount(DefinitionTooltip, { props: { ...base, actWide: wide } });
       expect(w.find("a.definition-actalike").exists()).toBe(false);

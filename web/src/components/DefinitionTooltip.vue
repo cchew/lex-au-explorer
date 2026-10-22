@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { actAlikeUrl } from "../lib/links";
-import { scopeLabel, normaliseDef } from "../lib/scopeLabel";
+import { scopeLabel, normaliseDef, type ScopeLookup } from "../lib/scopeLabel";
 
 const props = defineProps<{
   text: string;
@@ -9,12 +9,14 @@ const props = defineProps<{
   term?: string;
   actAlike?: boolean;
   scope?: string;
+  scopeLookup?: ScopeLookup;
+  regulation?: boolean;
   actWide?: { text: string; eid: string; term: string };
   via?: { actTitle: string; sectionEid?: string; resolved: boolean };
 }>();
 
 const href = computed(() => (props.term ? actAlikeUrl(props.term) : ""));
-const scopeInfo = computed(() => (props.scope ? scopeLabel(props.scope) : null));
+const scopeInfo = computed(() => (props.scope ? scopeLabel(props.scope, props.scopeLookup, { regulation: props.regulation }) : null));
 const differs = computed(
   () => !!props.actWide && normaliseDef(props.actWide.text) !== normaliseDef(props.text),
 );
@@ -38,7 +40,7 @@ const differs = computed(
         <p class="definition-actwide-label">Differs from the Act-wide definition:</p>
         <p class="definition-text">
           <strong v-if="actWide.term">{{ actWide.term }}</strong> {{ actWide.text }}
-          <span class="definition-actwide-ref mono">{{ scopeLabel(actWide.eid).text }}</span>
+          <span class="definition-actwide-ref mono">{{ scopeLabel(actWide.eid, scopeLookup, { regulation }).text }}</span>
         </p>
       </div>
     </template>
