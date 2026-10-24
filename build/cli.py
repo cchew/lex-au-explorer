@@ -188,8 +188,13 @@ def build_site(
             print(f"Warning: malformed XML for {meta.slug} ({e}) -- skipping")
             continue
 
+        # Graph id, not the bare work URI: two corpus Acts can share a work URI (SIS Regulations 1994
+        # and Act No. 57 of 1994); lex-au-graph keeps them apart under different ids.
+        graph_act_id = (
+            resolver.act_node_id(meta.frbr_uri, meta.title_id) if resolver is not None else meta.frbr_uri
+        )
         term_resolver = (
-            _TermResolverAdapter(resolver, meta.frbr_uri)
+            _TermResolverAdapter(resolver, graph_act_id)
             if resolver is not None
             else None
         )
@@ -205,7 +210,7 @@ def build_site(
         ref_tally[meta.slug] = _tally_dict(act_tally)
 
         if resolver:
-            rows = resolver.get_act_definitions(meta.frbr_uri, include_local=True)
+            rows = resolver.get_act_definitions(graph_act_id, include_local=True)
             if any("scope" not in r for r in rows):
                 # lex-au-graph 0.14.x accepts include_local but omits ``scope``; its local defs
                 # would ship as Act-wide. Fail closed.

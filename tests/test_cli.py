@@ -59,6 +59,9 @@ class _FakeResolver:
     def __init__(self, graph):
         self._graph = graph
 
+    def act_node_id(self, frbr_uri, title_id=None):
+        return frbr_uri
+
     def get_act_definitions(self, act_frbr_uri, include_local=False):
         _FakeResolver.include_local_calls.append(include_local)
         if act_frbr_uri == "/akn/au/act/1988/119":
