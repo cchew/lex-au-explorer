@@ -492,6 +492,41 @@ def test_schedule_label_verbatim_when_heading_already_says_schedule() -> None:
     assert toc[0]["heading"] == "Schedule 7"
 
 
+def _one_schedule_label(num: str, heading: str) -> str:
+    num_xml = f"<num>{num}</num>" if num else ""
+    root = ET.fromstring(
+        f'<akomaNtoso xmlns="{AKN[1:-1]}"><act><attachments><attachment>'
+        f'<hcontainer name="schedule" eId="schedule-1">'
+        f"{num_xml}<heading>{heading}</heading>"
+        f"<content><p>body</p></content></hcontainer>"
+        f"</attachment></attachments></act></akomaNtoso>"
+    )
+    return build_toc(root)[0]["heading"]
+
+
+def test_schedule_label_verbatim_when_heading_already_carries_its_num() -> None:
+    """Gazette-form heading that repeats the schedule's own <num> (SIS
+    Regulations schedule-2: <num>1AA</num><heading>Schedule\xa01AA</heading>)
+    is used verbatim, not doubled."""
+    assert _one_schedule_label("1AA", "Schedule\xa01AA") == "Schedule\xa01AA"
+    assert _one_schedule_label("I", "Schedule I—Oaths") == "Schedule I—Oaths"
+
+
+def test_schedule_label_prefixes_num_when_heading_word_schedule_lacks_it() -> None:
+    """Real-corpus regression (lex-au 6590d4d): Carriage of Goods by Sea Act
+    1991 schedule-2 is <num>1A</num><heading>Schedule of
+    modifications</heading>. The heading starts with the word "Schedule" but
+    not with its own number, so the number must still be prefixed rather
+    than the heading returned verbatim with the number dropped. Same for
+    Parliamentary Precincts Act 1988 schedule-3 (<num>3</num>)."""
+    assert _one_schedule_label("1A", "Schedule of modifications") == (
+        "Schedule 1A — Schedule of modifications"
+    )
+    assert _one_schedule_label(
+        "3", "Schedule to be inserted in Parliament Act 1974"
+    ) == "Schedule 3 — Schedule to be inserted in Parliament Act 1974"
+
+
 def test_clause_heading_carries_num() -> None:
     root = _parse_corpus("sched-clause.xml")
     sections, _ = build_sections(root, build_ref_index(_all_nav_eids(root)))

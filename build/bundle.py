@@ -596,7 +596,9 @@ def _schedule_label(sched: ET._Element) -> str:
 
     If the schedule's own ``<heading>`` already reads in gazette form (starts
     with the whole word "Schedule" -- see :func:`_starts_with_token` -- e.g.
-    "Schedule 2", "Schedule\\xa02", "Schedule I—") it is returned verbatim.
+    "Schedule 2", "Schedule\\xa02", "Schedule I—") and that word is followed
+    by the schedule's own ``<num>`` (or there is no ``<num>``), it is
+    returned verbatim.
     Otherwise a synthesised ``"Schedule {number}"`` label is used, with
     `` — {heading}`` appended when a heading exists. ``{number}`` prefers the
     schedule's own ``<num>`` (Task 3's gazetted number) when present, falling
@@ -616,11 +618,14 @@ def _schedule_label(sched: ET._Element) -> str:
     rejected), and one -- "Schedule to be inserted in Parliament Act 1974"
     (parliamentary-precincts-act-1988) -- is a literal heading that begins
     with the standalone word "Schedule" but carries no schedule number.
-    Judgment call: this one is still accepted (space is a valid boundary
-    character after "Schedule"), since the alternative would render as
-    "Schedule 1 — Schedule to be inserted in Parliament Act 1974" (that Act
-    has one schedule) -- a worse, doubled-"Schedule" result than the
-    original heading shown verbatim.
+    That judgment call was reversed once schedules carried their gazetted
+    ``<num>``: a heading beginning with the word "Schedule" is returned
+    verbatim only when the word is followed by the schedule's own ``<num>``
+    as a whole token (or the schedule has no ``<num>``). Otherwise the number
+    is prefixed as usual, so ``<num>3</num>`` + that heading reads "Schedule
+    3 — Schedule to be inserted in Parliament Act 1974", and Carriage of Goods
+    by Sea Act 1991's ``<num>1A</num>`` + "Schedule of modifications" reads
+    "Schedule 1A — Schedule of modifications" instead of dropping the number.
 
     ``ordinal`` is the schedule's 1-based position among *all* schedules in
     the document (every ``hcontainer[@name='schedule']`` reachable via
@@ -636,8 +641,6 @@ def _schedule_label(sched: ET._Element) -> str:
     """
     heading_el = sched.find(f"{AKN}heading")
     heading_text = (heading_el.text or "").strip() if heading_el is not None else ""
-    if _starts_with_token(heading_text, "Schedule"):
-        return heading_text
     # Task 23: the schedule's own <num> (Task 3 -- the gazetted number,
     # verbatim from the source "Schedule N" heading) takes precedence over
     # the document-position ordinal below when present. A small number of
@@ -645,6 +648,14 @@ def _schedule_label(sched: ET._Element) -> str:
     # third schedule by document position is still gazetted "5"), so the
     # ordinal and the gazetted number can legitimately differ.
     num_text = (sched.findtext(f"{AKN}num") or "").strip()
+    if _starts_with_token(heading_text, "Schedule"):
+        # Verbatim only when the heading already carries this schedule's own
+        # number ("Schedule\xa01AA" with <num>1AA</num>), or there is no
+        # <num> to lose. "Schedule of modifications" with <num>1A</num>
+        # (Carriage of Goods by Sea Act 1991) must still get the number.
+        rest = heading_text[len("Schedule"):].lstrip()
+        if not num_text or _starts_with_token(rest, num_text):
+            return heading_text
     if num_text:
         number = num_text
     else:
