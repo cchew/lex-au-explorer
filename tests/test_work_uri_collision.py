@@ -35,6 +35,9 @@ _REGS_BODY = """
         <content><p><term refersTo="#term-member--part-1__sec-1.05">member</term> means <def>a person in the fund.</def></p>
         <p>A member of a fund may leave.</p></content>
       </section>
+      <section eId="part-1__sec-1.06"><num>1.06</num><heading>Leaving</heading>
+        <content><p>A <ref href="#term-fund">fund</ref> may be wound up.</p></content>
+      </section>
     </part>"""
 
 _ACT_BODY = """
@@ -81,3 +84,19 @@ def test_acts_sharing_a_work_uri_get_only_their_own_terms(tmp_path):
     assert sorted(t["term"] for t in regs["terms"]) == ["fund", "member"]
     member = next(t for t in regs["terms"] if t["term"] == "member")
     assert member["defs"][0]["scope"] == "part-1__sec-1.05"
+
+
+def test_term_refs_resolve_against_the_instruments_own_graph_id(tmp_path):
+    """The resolver adapter must be bound to the graph id (not the bare work URI): "fund" is defined only
+    by the Regulations, so a #term-fund ref resolves to its definition section only on the ``~`` id."""
+    corpus = _corpus(tmp_path / "corpus")
+    g = LexAuGraph()
+    g.build(corpus)
+    graph_path = tmp_path / "graph.json"
+    g.save(graph_path)
+    out = tmp_path / "data"
+    build_site(corpus_index=corpus / "index.json", xml_dir=corpus / "xml", graph_path=graph_path, out_dir=out)
+
+    regs = json.loads((out / f"{REGS}.json").read_text())
+    html = regs["sections"]["part-1__sec-1.06"]["html"]
+    assert "part-1__sec-1.03" in html, html
