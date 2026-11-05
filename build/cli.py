@@ -432,7 +432,8 @@ def _write_schedule_parts(
     with a scoped definition inside this schedule; a ``terms`` key is written
     only when non-empty, so Acts without scoped defs are unchanged."""
     eids = _collect_section_eids(schedule_node)
-    sched_sections = {k: sections[k] for k in eids if k in sections}
+    # Iterate `sections` (document order), not the `eids` set (hash-seed order).
+    sched_sections = {k: v for k, v in sections.items() if k in eids}
     payload: dict = {"sections": sched_sections}
     if terms:
         payload["terms"] = terms

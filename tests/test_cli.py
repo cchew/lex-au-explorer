@@ -1070,3 +1070,19 @@ def test_lexaugraph_local_rows_carry_scope(tmp_path):
     g.add_act_data(parse_act(xml, entry))
     rows = DefinitionResolver(g).get_act_definitions("/akn/au/act/2026/1", include_local=True)
     assert {r["scope"] for r in rows} == {"act", "part-I__sec-5"}
+
+
+def test_write_schedule_parts_keeps_document_order(tmp_path):
+    """`eids` is a set, so iterating it made `sections` key order depend on
+    PYTHONHASHSEED (326 split-bundle files differed between builds)."""
+    import json as _json
+    from build.cli import _write_schedule_parts
+
+    ids = [f"schedule-1__clause-{n}" for n in range(1, 61)]
+    node = {"eid": "schedule-1", "children": [{"eid": e, "children": []} for e in ids]}
+    sections = {e: {"html": e} for e in ["schedule-1", *ids]}
+
+    _write_schedule_parts(tmp_path, node, sections)
+
+    written = _json.loads((tmp_path / "schedule-1.json").read_text())["sections"]
+    assert list(written) == list(sections)
