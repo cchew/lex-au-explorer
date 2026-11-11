@@ -44,9 +44,10 @@ class ActMeta:
 
 # lex-au index.json "structure_version" values the explorer has been tested against
 # (lex-au corpus.py STRUCTURE_VERSION): 1 flat schedules, 2 nested schedules and
-# quotedStructure amendments. An unknown value means lex-au changed shape again;
+# quotedStructure amendments, 3 (i)/(ii) nested as subparagraph and restarted lists
+# scoped `lstN`. An unknown value means lex-au changed shape again;
 # refuse rather than render a silently incomplete site.
-SUPPORTED_STRUCTURE_VERSIONS = frozenset({1, 2})
+SUPPORTED_STRUCTURE_VERSIONS = frozenset({1, 2, 3})
 
 
 class UnsupportedCorpusStructure(RuntimeError):
