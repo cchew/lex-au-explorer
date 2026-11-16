@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "predeploy": "cd .. && .venv/bin/lex-au-explorer-build --corpus-dir ../../lex-au/repo/corpus --graph ../../lex-au-graph/repo/graph.json --out web/public/data --corpus-images ../../lex-au/repo/corpus/images",
+    "predeploy": "node scripts/predeploy.mjs",
+    "restore-fixtures": "git checkout -- public/data",
+    "deploy": "npm run predeploy && npm run build && (cd .. && netlify deploy --prod --dir=web/dist) && npm run restore-fixtures",
     "verify-corpus": "node scripts/verify-corpus-data.mjs",
     "build": "npm run verify-corpus && vue-tsc --noEmit && vite build",
     "test": "vitest run",

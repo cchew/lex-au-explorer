@@ -76,10 +76,22 @@ Netlify does not run the build: its build container has neither the sibling
 locally and the resulting `web/dist/` (with the real corpus baked in via
 Vite bundling `public/`) deployed as a pre-built directory.
 
-    cd web
-    npm run predeploy          # runs the Python build pipeline, writes web/public/data
-    npm run build               # verify-corpus + vue-tsc + vite build; bakes public/data into dist/
-    netlify deploy --prod --dir=dist   # deploys the pre-built dist/, no remote build
+    # 1. A verified corpus restore and the published graph (never the local lex-au/corpus snapshots):
+    cd ../lex-au/repo && python scripts/restore_corpus_from_hf.py --repo cchew/lex-au --local-dir /path/to/corpus
+    # download graph.json from https://huggingface.co/datasets/cchew/lex-au-graph (rebuilt by that repo's CI)
+
+    # 2. Optional but recommended: refresh the source-fidelity file, then commit it
+    lex-au-explorer-verify --corpus-dir /path/to/corpus
+
+    # 3. Build, deploy, restore the tracked E2E fixtures
+    cd ../../lex-au-explorer/repo/web
+    LEXAU_CORPUS_DIR=/path/to/corpus LEXAU_GRAPH_JSON=/path/to/graph.json npm run deploy
+
+`npm run deploy` runs `predeploy` (the Python data build, about 50 minutes; it refuses to start without
+`LEXAU_CORPUS_DIR` and `LEXAU_GRAPH_JSON`), `build` (corpus-size check, type-check, vite), `netlify deploy
+--prod`, and finally `restore-fixtures` (`git checkout -- public/data`), which puts back the 4 tracked E2E
+fixture files the build overwrites. If the deploy step fails the restore is skipped on purpose, so the staged
+data is still there for a retry. The graph must be built from the same corpus revision.
 
 `web/public/data/` doubles as the real-corpus staging dir (gitignored, written
 by `predeploy`) and 4 git-tracked E2E fixture files (`index.json` among

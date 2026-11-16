@@ -15,7 +15,8 @@ Applications: this repo -- the first public-facing showcase surface for the stac
 
     python -m venv .venv && source .venv/bin/activate
     pip install -e ".[dev]"
-    lex-au-explorer-build --corpus-dir ../../lex-au/repo/corpus --graph ../../lex-au-graph/repo/graph.json --out web/data
+    # inputs: a restored lex-au corpus (scripts/restore_corpus_from_hf.py) and the published graph.json
+    LEXAU_CORPUS_DIR=... LEXAU_GRAPH_JSON=... npm run deploy   # from web/; see README Deploy
 
 `build/verification.py` + `lex-au-explorer-verify` do an out-of-band currency
 check against legislation.gov.au's OData API, writing `web/verification.json`.
